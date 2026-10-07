@@ -100,7 +100,7 @@ UNQUOTE = re.compile(r"'[^']*'|\"[^\"]*\"")
 HEREDOC = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n.*?\n\s*\1\s*(\n|$)", re.S)
 LOOP = re.compile(r'\b(while|until)\b[^\n]*?\bdo\b')
 ENDLESS = re.compile(r'\bwhile\s+(true|:|\[\s*1\s*\]|\[\[\s*1\s*\]\])\s*[;\n]|\buntil\s+false\s*[;\n]')
-BOUND = re.compile(r'\$SECONDS|\bSECONDS\b|-(lt|gt|le|ge)\b|\bseq\s+\d|\bbreak\b|\$\(\(\s*\w+\s*[-+]|\(\(\s*\w+\s*[-+<>]')
+BOUND = re.compile(r'\bwhile\s+(IFS=\S*\s+)?read\b|\$SECONDS|\bSECONDS\b|-(lt|gt|le|ge)\b|\bseq\s+\d|\bbreak\b|\$\(\(\s*\w+\s*[-+]|\(\(\s*\w+\s*[-+<>]')
 
 
 def code_only(body):
@@ -128,7 +128,7 @@ def check_per_call_limits(u):
         deny('No endless loops (while true / until false). Bound the loop by SECONDS or a counter and print '
              '"limit reached" when the bound is hit.')
     if LOOP.search(u) and not BOUND.search(u):
-        deny('This while/until loop has no visible bound (SECONDS comparison, -lt/-gt counter, seq, or break). '
+        deny('This while/until loop has no visible bound (SECONDS comparison, -lt/-gt counter, seq, break, or `while read` over finite input). '
              'Add one and print "limit reached" when it is hit.')
 
 

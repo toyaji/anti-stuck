@@ -10,7 +10,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CORE = os.path.join(REPO, 'plugins', 'anti-stuck')
 FLUTTER = os.path.join(REPO, 'plugins', 'anti-stuck-flutter')
 HOME = tempfile.mkdtemp(prefix='anti-stuck-test-')
-ENV = {**os.environ, 'ANTI_STUCK_HOME': HOME, 'CLAUDE_PLUGIN_ROOT': CORE}
+CLEAN_PATH = ':'.join(p for p in os.environ.get('PATH', '').split(':') if '.anti-stuck' not in p)
+ENV = {**os.environ, 'PATH': CLEAN_PATH, 'ANTI_STUCK_HOME': HOME, 'CLAUDE_PLUGIN_ROOT': CORE}
 fails = 0
 
 
@@ -34,6 +35,7 @@ def enforce(cmd, cwd='/tmp'):
 
 # ── launcher
 rc, _, err = hook(CORE, 'no_such_script.py', {})
+
 check('run.sh: missing script passes (exit 0), never blocks', rc == 0 and 'missing' in err, (rc, err))
 
 # ── core rules, no packs installed
@@ -51,6 +53,8 @@ for name, cmd, want in [
     ('nohup', 'nohup x &', 'deny'),
     ('heredoc body ignored', "cat > f <<EOF\ncurl later\nEOF\n", 'allow'),
     ('string ignored', 'echo "curl later"', 'allow'),
+    ('while read over input is bounded', 'ls | while read f; do echo $f; done', 'allow'),
+    ('while IFS= read is bounded', 'printf "a\\n" | while IFS= read -r l; do echo $l; done', 'allow'),
     ('direct tlimit', 'tlimit 5 ls', 'deny'),
     ('flutter run allowed without the pack', 'flutter run -d x', 'allow'),
 ]:
@@ -78,11 +82,11 @@ check('tlimit: log under ANTI_STUCK_HOME', 'KILLED\t2\t' in open(os.path.join(HO
 p = subprocess.run(['sh', os.path.join(FLUTTER, 'scripts', 'install_pack.sh')], env=ENV, timeout=10)
 installed = sorted(os.listdir(os.path.join(HOME, 'packs', 'flutter')))
 check('pack: install_pack.sh publishes 3 rule files', installed == ['command-timeouts.json', 'reap-patterns.json', 'route-rules.json'], installed)
-subprocess.run(['sh', os.path.join(CORE, 'scripts', 'install_tools.sh')], env=ENV, timeout=10)
-check('tools: launchers written to ANTI_STUCK_HOME/bin', sorted(os.listdir(os.path.join(HOME, 'bin'))) == ['devctl', 'stuck-bg'])
-_, wrapped = enforce('devctl status; stuck-bg list')
+got, text = enforce('# eta:5 x\nflutter run -d x')
+check('pack route: deny message names the installed devctl path', os.path.join(FLUTTER, 'scripts', 'devctl') in text, text)
+_, wrapped = enforce(f'{os.path.join(FLUTTER, "scripts", "devctl")} status; echo PATH=$PATH')
 p = subprocess.run(wrapped, shell=True, capture_output=True, text=True, timeout=20, env=ENV)
-check('tools: devctl and stuck-bg callable by name inside tlimit', p.returncode == 0 and 'no devices' in p.stdout and 'ledger is empty' in p.stdout, p.stdout + p.stderr)
+check('tools: devctl runs by full path; tlimit leaves PATH untouched', p.returncode == 0 and 'no devices' in p.stdout and p.stdout.split('PATH=')[-1].strip() == CLEAN_PATH, p.stdout + p.stderr)
 rc, _, err = hook(CORE, 'no_such_script.py', {})
 got, text = enforce('# eta:5 x\nflutter run -d x')
 check('pack route: flutter run -> devctl', got == 'deny' and 'devctl' in text, text)
@@ -102,6 +106,7 @@ check('report: 65 s call', '65 s' in report({'tool_name': 'Bash', 'tool_input': 
 loop_wrapped = enforce('SECONDS=0; while [ $SECONDS -lt 9 ]; do sleep 1; done')[1]
 check('report: loop inside tlimit wrapper', 'wait loop' in report({'tool_name': 'Bash', 'tool_input': {'command': loop_wrapped}, 'tool_response': 'x', 'duration_ms': 9000}))
 check('report: MCP 25 s', 'MCP' in report({'tool_name': 'mcp__marionette__connect', 'tool_input': {}, 'tool_response': 'x', 'duration_ms': 25000}))
+check('report: eta inside the body is not the header', 'eta was' not in report({'tool_name': 'Bash', 'tool_input': {'command': 'echo "# eta:5 x"; true'}, 'tool_response': 'x', 'duration_ms': 30000}))
 check('report: agent end', 'subagent' in report({'tool_name': 'Agent', 'tool_input': {}, 'tool_response': 'x', 'duration_ms': 90000}))
 
 # ── background ledger
@@ -112,6 +117,7 @@ def bg(payload):
 r = bg({'hook_event_name': 'PostToolUse', 'tool_name': 'Bash', 'session_id': 'S1', 'tool_use_id': 'toolu_000000BGTEST1',
         'tool_input': {'command': '# eta:1 x\nsleep 1', 'run_in_background': True}, 'tool_response': 'started'})
 check('ledger: background bash registered', r and 'BGTEST1' in r['hookSpecificOutput']['additionalContext'], r)
+check('ledger: message names the full stuck-bg path', r and os.path.join(CORE, 'scripts', 'stuck-bg') in r['hookSpecificOutput']['additionalContext'], r)
 check('ledger: foreground bash ignored', bg({'hook_event_name': 'PostToolUse', 'tool_name': 'Bash', 'session_id': 'S1', 'tool_input': {'command': 'ls'}, 'tool_response': 'x'}) is None)
 time.sleep(1.5)
 r = bg({'hook_event_name': 'PreToolUse', 'tool_name': 'Read', 'session_id': 'S1', 'tool_input': {}})

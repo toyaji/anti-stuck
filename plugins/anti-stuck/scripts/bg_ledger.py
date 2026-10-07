@@ -15,6 +15,8 @@ import re
 import sys
 import time
 
+ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT') or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STUCK_BG = os.path.join(ROOT, 'scripts', 'stuck-bg')
 HOME = os.environ.get('ANTI_STUCK_HOME') or os.path.expanduser('~/.anti-stuck')
 LEDGER = os.path.join(HOME, 'state', 'bg-ledger.json')
 DEFAULT_ETA = {'Bash': 300, 'Agent': 600}
@@ -54,7 +56,7 @@ def summary(tool, inp):
 
 
 def eta_of(tool, inp):
-    m = re.search(r'#\s*eta:(\d+)', inp.get('command', '')) if tool == 'Bash' else None
+    m = re.match(r'\s*#\s*eta:(\d+)', inp.get('command', '')) if tool == 'Bash' else None  # header line only
     return int(m.group(1)) if m else DEFAULT_ETA.get(tool, 300)
 
 
@@ -81,7 +83,7 @@ def post_tool_use(d):
     emit({'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext':
           f'[anti-stuck: background ledger] registered as {entry_id}, expected to finish by '
           f'{time.strftime("%H:%M", time.localtime(now + eta))} (eta {eta} s). Tell the user that time. When it ends, '
-          f'report the result and run `stuck-bg done {entry_id}`.'}})
+          f'report the result and run `{STUCK_BG} done {entry_id}`.'}})
 
 
 def subagent_stop(d):
@@ -116,7 +118,7 @@ def pre_tool_use(d):
         emit({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'additionalContext':
               '[anti-stuck: background ledger] unreported work: ' + ' / '.join(describe(i) for i in due) +
               '. Check its state now and tell the user (finished / failed / still running); clear finished ones with '
-              '`stuck-bg done <id>`.'}})
+              f'`{STUCK_BG} done <id>`.'}})
 
 
 def stop(d):
@@ -128,7 +130,7 @@ def stop(d):
         emit({'decision': 'block', 'reason':
               '[anti-stuck: background ledger] background work was never reported: ' +
               ' / '.join(describe(i) for i in due) +
-              '. Check it, tell the user in one line, clear finished entries with `stuck-bg done <id>`, then stop.'})
+              '. Check it, tell the user in one line, clear finished entries with `{STUCK_BG} done <id>`, then stop.'})
 
 
 def cli(args):

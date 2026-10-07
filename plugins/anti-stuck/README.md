@@ -24,8 +24,7 @@ their own rules on top. Full documentation, packs and how to contribute: <https:
 - **Reads** the session transcript file that Claude Code passes to hooks, only to see whether your last message asked
   for background work; `ps` output to find runaway processes; the timeout registries described below
 - **Writes** only under `~/.anti-stuck/` (override with `ANTI_STUCK_HOME`): logs, a background-task ledger, subagent
-  clocks, and a launcher `~/.anti-stuck/bin/stuck-bg` created at session start. Bash commands run with
-  `~/.anti-stuck/bin` added to `PATH`
+  clocks. It never changes `PATH` or anything outside that folder
 - **Kills** only processes matching listed patterns when a session stops: whole-disk `find /` or `grep -r … /` older
   than 5 min, plus patterns that installed packs publish under `~/.anti-stuck/packs/`
 - **Reads rules** from `~/.anti-stuck/packs/*/`, `~/.anti-stuck/command-timeouts.json` and a project's
@@ -37,7 +36,8 @@ their own rules on top. Full documentation, packs and how to contribute: <https:
 
 ## Commands
 
-`stuck-bg list` shows tracked background work; `stuck-bg done <id>` clears an entry after it is reported.
+The **background-ledger** skill gives Claude the full path of `scripts/stuck-bg`: `list` shows tracked background work,
+`done <id>` clears an entry after it is reported.
 
 ## Recommended settings it cannot set for you
 

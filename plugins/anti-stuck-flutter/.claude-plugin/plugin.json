@@ -1,7 +1,7 @@
 {
   "name": "anti-stuck-flutter",
   "displayName": "Anti-Stuck for Flutter",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Flutter pack for anti-stuck: devctl, a cross-session ledger for real devices, emulators and heavy builds; fail-fast Marionette MCP guards; Flutter build/test time limits; flutter_tester runaway cleanup.",
   "author": { "name": "toyaji" },
   "homepage": "https://github.com/toyaji/anti-stuck",

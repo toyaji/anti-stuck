@@ -44,7 +44,7 @@ def main():
     reasons = []
     if tool == 'Bash':
         cmd = unwrap_tlimit(inp.get('command', ''))
-        m = re.search(r'#\s*eta:(\d+)', cmd)
+        m = re.match(r'\s*(?:#\s*tlimit:\d+[^\n]*\n\s*)?#\s*eta:(\d+)', cmd)  # header line only
         eta = int(m.group(1)) if m else None
         if '[tlimit]' in text or re.search(r'exit code 124|exited with code 124', text):
             reasons.append('it was killed at its time limit — say why')

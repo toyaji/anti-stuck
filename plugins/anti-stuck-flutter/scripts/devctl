@@ -31,6 +31,7 @@ LOCK = os.path.join(STATE, 'ledger.lock')
 URI_RE = re.compile(r'(http://127\.0\.0\.1:\d+/[A-Za-z0-9_=\-]+=/)')
 RUN_WAIT_SEC = 1400
 FREE_APP_TTL_SEC = 3600
+DEVCTL = os.path.abspath(__file__)  # messages give Claude the exact path to call
 
 
 # ───── session · ledger ─────
@@ -118,7 +119,7 @@ def describe(key, d, me=None):
         lines = [f"■ {key} — in use by {o['label']}{mine}  purpose: {d.get('purpose') or '-'}  since {d['since']}",
                  f"    working dir: {o['cwd']}"]
     else:
-        lines = [f"□ {key} — free (no owner since {d.get('free_since', '-')}). A running app can be reused as is — devctl run {key}"]
+        lines = [f"□ {key} — free (no owner since {d.get('free_since', '-')}). A running app can be reused as is — {DEVCTL} run {key}"]
     app = d.get('app')
     if app:
         lines.append(f"    app: pid {app['pid']}  {app['branch']}@{app['head']}{' (with uncommitted changes)' if app.get('dirty') else ''}  started {app['started']}")
@@ -188,7 +189,7 @@ def take(led, key, me, purpose):
     d = led.devices.get(key)
     if d and d.get('owner') and d['owner']['pid'] != me['pid']:
         return None, (describe(key, d, me) + f"\n-> Another session is using it. Do not stop it or start a new app — "
-                      f"`devctl wait {key} \"purpose\"` to join the wait list, then continue through the Marionette address above.")
+                      f"`{DEVCTL} wait {key} \"purpose\"` to join the wait list, then continue through the Marionette address above.")
     if not d:
         d = led.devices[key] = {'owner': None, 'purpose': purpose, 'since': now(), 'app': None, 'waiters': []}
     if not d.get('owner'):
@@ -220,7 +221,7 @@ def cmd_wait(args, me):
             print(f'{key}: nobody is using it. Use it directly.')
             return
         if not d.get('owner'):
-            print(f'{key}: free (app still running). Use it directly — devctl run {key}')
+            print(f'{key}: free (app still running). Use it directly — {DEVCTL} run {key}')
             return
         if d['owner']['pid'] == me['pid']:
             print(f'{key}: already mine.')
@@ -228,7 +229,7 @@ def cmd_wait(args, me):
         if not any(w['pid'] == me['pid'] for w in d['waiters']):
             d['waiters'].append({**{k: me[k] for k in ('pid', 'label', 'cwd')}, 'purpose': purpose, 'since': now()})
         pos = [w['pid'] for w in d['waiters']].index(me['pid']) + 1
-        print(describe(key, d, me) + f'\n-> waiting, position {pos}. When it is handed over, devctl status shows me as owner.')
+        print(describe(key, d, me) + f'\n-> waiting, position {pos}. When it is handed over, {DEVCTL} status shows me as owner.')
 
 
 def cmd_release(args, me):
@@ -254,9 +255,9 @@ def cmd_stop(args, me):
             print(f'{key}: not held.')
             return
         if d.get('owner') and d['owner']['pid'] != me['pid']:
-            sys.exit(f"{key}: {d['owner']['label']} is using it, so it cannot be stopped. `devctl wait {key}` instead.")
+            sys.exit(f"{key}: {d['owner']['label']} is using it, so it cannot be stopped. `{DEVCTL} wait {key}` instead.")
         if d.get('waiters'):
-            sys.exit(f"{key}: sessions are waiting for it, so it is not stopped. `devctl release {key}` to hand it over.")
+            sys.exit(f"{key}: sessions are waiting for it, so it is not stopped. `{DEVCTL} release {key}` to hand it over.")
         print(kill_device(led, key))
 
 
@@ -272,9 +273,9 @@ def cmd_send(args, me, key_char):
     with Ledger() as led:
         d = led.devices.get(key)
         if not d or not d.get('app'):
-            sys.exit(f'{key}: no app running. Start it with devctl run {key}.')
+            sys.exit(f'{key}: no app running. Start it with {DEVCTL} run {key}.')
         if d.get('owner') and d['owner']['pid'] != me['pid']:
-            sys.exit(describe(key, d, me) + f'\n-> someone else\'s app. `devctl wait {key}`.')
+            sys.exit(describe(key, d, me) + f'\n-> someone else\'s app. `{DEVCTL} wait {key}`.')
         ws = d['app'].get('ws')
     tool = 'hot_reload' if key_char == 'r' else 'hot_restart'
     sys.exit(f"{key}: flutter run does not take keys from a pipe. Connect with Marionette (connect {ws}) and use its {tool} tool.")
@@ -327,12 +328,12 @@ def cmd_run(args, me):
             stop_app(d.get('app'))
             d['app'] = None
         sys.exit(f'{key}: the app did not start (build failed or over {RUN_WAIT_SEC} s). You still own the device — '
-                 f'`devctl release {key}` if you are done.\n{tail}')
+                 f'`{DEVCTL} release {key}` if you are done.\n{tail}')
 
 
 def cmd_exec(args, me, auto_release=False):
     if '--' not in args:
-        sys.exit('usage: devctl exec <device> -- <command>')
+        sys.exit(f'usage: {DEVCTL} exec <device> -- <command>')
     i = args.index('--')
     key, cmd = args[0], args[i + 1:]
     with Ledger() as led:
@@ -373,7 +374,7 @@ def cmd_emu(args, me):
         if why:
             sys.exit(why)
         d['emulator_pid'] = proc.pid
-        print(describe(serial, d, me) + f'\n-> start the app with devctl run {serial}')
+        print(describe(serial, d, me) + f'\n-> start the app with {DEVCTL} run {serial}')
 
 
 def main():

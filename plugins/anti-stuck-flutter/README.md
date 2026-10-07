@@ -7,7 +7,7 @@ Documentation and contributing: <https://github.com/toyaji/anti-stuck>.
 
 ## What it does
 
-- **`devctl`** — one ledger that every Claude Code session on the machine shares for real devices, emulators and
+- **`devctl`** (taught to Claude by the **devctl** skill, which carries its full path) — one ledger that every Claude Code session on the machine shares for real devices, emulators and
   heavy builds: `status`, `run <device> [flutter run args]`, `exec <device> -- <cmd>`, `build -- <cmd>` (one at a
   time), `wait <device>`, `release <device>` (the app keeps running for the next session), `stop <device>`, `emu <avd>`
 - **Routing** — `flutter run/attach/install/drive/build`, integration tests, `patrol`, `fastlane`, Gradle installs,
@@ -28,7 +28,7 @@ Documentation and contributing: <https://github.com/toyaji/anti-stuck>.
   respond. Nothing leaves your machine
 - **Reads** `android/app/build.gradle(.kts)` of the running app to find its `applicationId`
 - **Writes** under `~/.anti-stuck/`: the device ledger and app logs (`state/devices/`), the last Marionette address,
-  this pack's rule files (`packs/flutter/`) and a launcher `~/.anti-stuck/bin/devctl`, created at session start
+  and this pack's rule files (`packs/flutter/`), refreshed at session start. It never changes `PATH`
 - **Stops** an app or emulator only when you run `devctl stop`, or when a device has been left free for 60 min.
   When a session goes idle it releases its devices but leaves apps running
 

@@ -1,7 +1,7 @@
 {
   "name": "anti-stuck",
   "displayName": "Anti-Stuck",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Claude Code never waits forever: process-group time limits on every Bash call, eta declarations, per-call limit rules, forced reporting when long or background work ends, and subagent time budgets. Framework packs (e.g. anti-stuck-flutter) add their own rules.",
   "author": { "name": "toyaji" },
   "homepage": "https://github.com/toyaji/anti-stuck",

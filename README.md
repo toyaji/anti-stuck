@@ -26,7 +26,7 @@ None of these are bugs in a single command. They are **missing limits and missin
 | Long commands start with no idea how long they take | Commands allowed more than 300 s must start with `# eta:<seconds> <what>`; the limit becomes `min(registry, eta × 2)` |
 | One network call inside a loop hangs the whole loop | Denied: `curl` without `--max-time`, `aws` without `--cli-read-timeout`, `gh … --watch`, `sleep ≥ 60`, `setsid`/`nohup`/`disown`, `while true`, and `while`/`until` without a visible bound |
 | Work finishes and Claude silently moves on | After a call over 60 s, a wait loop, an MCP call over 20 s, a kill, or a subagent run, Claude is told to report on the first line of its next reply |
-| Background work is forgotten | A ledger tracks every background Bash/Agent call; overdue or finished entries are pushed back to Claude on every tool call, and an unreported one blocks the stop once (`stuck-bg list`, `stuck-bg done <id>`) |
+| Background work is forgotten | A ledger tracks every background Bash/Agent call; overdue or finished entries are pushed back to Claude on every tool call, and an unreported one blocks the stop once (the **background-ledger** skill lists and clears entries) |
 | Subagents run for an hour | Elapsed time is shown on every subagent tool call; past the limit (10 min default) its tools are denied, so it reports and stops |
 | Runaway processes | Whole-disk searches older than 5 min (plus pack patterns) are killed when a session stops |
 | A broken hook blocks everything | Hooks run through a launcher that lets tools through if a hook script is missing, instead of blocking every call |
@@ -35,7 +35,7 @@ None of these are bugs in a single command. They are **missing limits and missin
 
 | Pack | What it adds |
 |---|---|
-| [`anti-stuck-flutter`](plugins/anti-stuck-flutter) | `devctl` — a ledger that lets sessions share real devices, emulators and heavy builds (`status`, `run`, `exec`, `build`, `wait`, `release`, `stop`); fail-fast Marionette MCP guards; Flutter build/test time limits; routing `flutter run`/`adb`/`emulator` through `devctl`; `flutter_tester` cleanup |
+| [`anti-stuck-flutter`](plugins/anti-stuck-flutter) | `devctl` (with a **devctl** skill) — a ledger that lets sessions share real devices, emulators and heavy builds (`status`, `run`, `exec`, `build`, `wait`, `release`, `stop`); fail-fast Marionette MCP guards; Flutter build/test time limits; routing `flutter run`/`adb`/`emulator` through `devctl`; `flutter_tester` cleanup |
 | *your framework here* | Xcode, Android/Gradle, Docker, Node, Rust, Python… see [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ## Install
@@ -68,11 +68,12 @@ Without these, a hung stdio MCP server is only cut after **30 minutes**.
 
 ## Daily use
 
+Claude gets two skills that carry the exact command paths: **background-ledger** (core) and **devctl** (Flutter pack).
+Long commands start with an eta line, which Claude writes itself:
+
 ```bash
-stuck-bg list                                   # background work being tracked
-# eta:400 release apk build                     # Claude writes this line itself for long commands
-devctl build -- flutter build apk --release     # (Flutter pack) one heavy build at a time across sessions
-devctl status                                   # (Flutter pack) who uses which device, app build, Marionette address
+# eta:400 release apk build
+<path to devctl> build -- flutter build apk --release
 ```
 
 Your own limits go in a project's `.claude/command-timeouts.json` or `~/.anti-stuck/command-timeouts.json`:
@@ -97,7 +98,7 @@ Your own limits go in a project's `.claude/command-timeouts.json` or `~/.anti-st
 - macOS or Linux, `python3`, `perl` (both preinstalled on macOS). Windows is not supported yet
 - Rules read the command text, so a word inside an unusual quoting form can still match. Rephrase the command if that happens
 - If a PreToolUse hook itself exceeds its timeout, Claude Code lets the tool run (documented behavior), so hooks only make quick checks
-- State, logs and the `devctl`/`stuck-bg` launchers live in `~/.anti-stuck/` (override with `ANTI_STUCK_HOME`); `tlimit` adds `~/.anti-stuck/bin` to `PATH` for every Bash command. Each plugin's own README lists exactly what it runs, reads, writes and kills
+- State and logs live in `~/.anti-stuck/` (override with `ANTI_STUCK_HOME`). The plugins never change your `PATH`; tools are called by full path from their skills. Each plugin's own README lists exactly what it runs, reads, writes and kills
 
 ## License
 

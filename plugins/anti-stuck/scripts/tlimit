@@ -8,7 +8,6 @@ die "usage: tlimit <seconds> <command> [key]\n" unless defined $cmd && $secs =~ 
 $key //= sha1_hex($cmd);
 my $home = $ENV{ANTI_STUCK_HOME} || "$ENV{HOME}/.anti-stuck";
 make_path("$home/logs");
-$ENV{PATH} = "$home/bin:" . ($ENV{PATH} // '');  # devctl, stuck-bg: shims written at session start
 my $log = "$home/logs/tlimit.log";
 sub note { open(my $f, '>>', $log) or return; my ($s) = @_; print $f $s; close $f; }
 my $shell = -x '/bin/zsh' ? '/bin/zsh' : '/bin/bash';

@@ -30,8 +30,9 @@ plugins/anti-stuck-<framework>/
 │   ├── command-timeouts.json         # {"rules": [{"pattern": "<regex>", "limit": <seconds>}]}
 │   ├── route-rules.json              # {"rules": [{"pattern": "<regex>", "unless": "<regex>", "message": "..."}]}
 │   └── reap-patterns.json            # {"patterns": [{"match": "<regex>", "orphan": true, "max_age": <s>, "reason": "..."}]}
-├── scripts/install_pack.sh           # copies pack/*.json to ~/.anti-stuck/packs/<framework>/ (and writes tool launchers)
+├── scripts/install_pack.sh           # copies pack/*.json to ~/.anti-stuck/packs/<framework>/ 
 ├── scripts/run.sh                    # copy of the core launcher, for any hook scripts of your own
+├── skills/<tool>/SKILL.md            # how Claude calls your tools, by full path
 ├── README.md                         # 40+ words, and what the pack runs, reads, writes and kills
 └── LICENSE
 ```
@@ -47,7 +48,7 @@ Rules for packs:
 - **Do not add a PreToolUse hook on Bash that rewrites the command.** Only the core wraps commands; two wrappers conflict.
   Checks that only allow or deny (like the Flutter pack's Marionette guard) are fine.
 - Hook scripts run through `sh "${CLAUDE_PLUGIN_ROOT}/scripts/run.sh" "${CLAUDE_PLUGIN_ROOT}/scripts/<script>"` so a missing file never blocks every tool call.
-- No top-level `bin/` folder (claude.ai and Cowork refuse to install plugins that have one). Put tools in `scripts/` and have `install_pack.sh` write a launcher into `~/.anti-stuck/bin/`, which `tlimit` puts on `PATH` for every Bash command.
+- No top-level `bin/` folder (claude.ai and Cowork refuse to install plugins that have one). Put tools in `scripts/` and tell Claude about them in a skill (`skills/<name>/SKILL.md`) that names the full path `"${CLAUDE_PLUGIN_ROOT}/scripts/<tool>"` — Claude Code substitutes it. Do not change `PATH`. In hook messages, build the path from the `CLAUDE_PLUGIN_ROOT` environment variable; in pack JSON, use a placeholder that `install_pack.sh` fills in (see the Flutter pack's `{{DEVCTL}}`).
 - Each plugin folder needs its own `README.md` and `LICENSE` so it can be submitted to Anthropic's directory on its own.
 - Hooks must finish in a few seconds: if a PreToolUse hook times out, Claude Code runs the tool anyway.
 - Add the pack to `.claude-plugin/marketplace.json` and to the Packs table in `README.md`.

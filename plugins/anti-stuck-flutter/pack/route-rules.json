@@ -4,7 +4,7 @@
     {
       "pattern": "\\bflutter\\s+(run|attach|install|drive|build)\\b|\\bflutter\\s+test\\b[^\\n;&|]*integration_test|\\bflutter\\s+emulators\\s+--launch\\b|\\bpatrol\\s+(test|develop|build)\\b|\\bfastlane\\b|\\bgradlew\\b[^\\n;&|]*\\b(assemble|install|bundle)|\\badb\\b[^\\n;&|]*\\b(install|uninstall|reboot|emu|kill-server|shell\\s+(am|pm|input|monkey))\\b|(^|[\\s;&|(])emulator\\s+-avd\\b|\\bxcrun\\s+simctl\\s+(boot|shutdown|install|uninstall|launch|terminate|erase)\\b|\\b(pkill|killall)\\b[^\\n;&|]*(flutter|dart|emulator|qemu|adb|Simulator|gradle)",
       "unless": "^\\s*(#[^\\n]*\\n\\s*)*(\\S*/)?devctl\\b",
-      "message": "Devices, emulators and heavy builds are shared between sessions through the devctl ledger. Run `devctl status` first, then `devctl run <device> [flutter run args]`, `devctl exec <device> -- <cmd>`, `devctl build -- <cmd>` or `devctl emu <avd>`. If another session owns the device, `devctl wait <device> \"purpose\"`; when done, `devctl release <device>`. Never kill other sessions' apps or emulators (pkill etc.)."
+      "message": "Devices, emulators and heavy builds are shared between sessions through the devctl ledger. The devctl command is `{{DEVCTL}}` (see the devctl skill). Run `{{DEVCTL}} status` first, then `{{DEVCTL}} run <device> [flutter run args]`, `{{DEVCTL}} exec <device> -- <cmd>`, `{{DEVCTL}} build -- <cmd>` or `{{DEVCTL}} emu <avd>`. If another session owns the device, `{{DEVCTL}} wait <device> \"purpose\"`; when done, `{{DEVCTL}} release <device>`. Never kill other sessions' apps or emulators (pkill etc.)."
     }
   ]
 }

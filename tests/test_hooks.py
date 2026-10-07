@@ -15,7 +15,7 @@ fails = 0
 
 
 def hook(root, script, payload, env=None):
-    p = subprocess.run(['sh', os.path.join(root, 'scripts', 'run.sh'), script], input=json.dumps(payload),
+    p = subprocess.run(['sh', os.path.join(root, 'scripts', 'run.sh'), os.path.join(root, 'scripts', script)], input=json.dumps(payload),
                        capture_output=True, text=True, env={**ENV, 'CLAUDE_PLUGIN_ROOT': root, **(env or {})}, timeout=20)
     return p.returncode, p.stdout.strip(), p.stderr.strip()
 
@@ -78,6 +78,12 @@ check('tlimit: log under ANTI_STUCK_HOME', 'KILLED\t2\t' in open(os.path.join(HO
 p = subprocess.run(['sh', os.path.join(FLUTTER, 'scripts', 'install_pack.sh')], env=ENV, timeout=10)
 installed = sorted(os.listdir(os.path.join(HOME, 'packs', 'flutter')))
 check('pack: install_pack.sh publishes 3 rule files', installed == ['command-timeouts.json', 'reap-patterns.json', 'route-rules.json'], installed)
+subprocess.run(['sh', os.path.join(CORE, 'scripts', 'install_tools.sh')], env=ENV, timeout=10)
+check('tools: launchers written to ANTI_STUCK_HOME/bin', sorted(os.listdir(os.path.join(HOME, 'bin'))) == ['devctl', 'stuck-bg'])
+_, wrapped = enforce('devctl status; stuck-bg list')
+p = subprocess.run(wrapped, shell=True, capture_output=True, text=True, timeout=20, env=ENV)
+check('tools: devctl and stuck-bg callable by name inside tlimit', p.returncode == 0 and 'no devices' in p.stdout and 'ledger is empty' in p.stdout, p.stdout + p.stderr)
+rc, _, err = hook(CORE, 'no_such_script.py', {})
 got, text = enforce('# eta:5 x\nflutter run -d x')
 check('pack route: flutter run -> devctl', got == 'deny' and 'devctl' in text, text)
 got, _ = enforce('adb -s x install a.apk')
@@ -115,7 +121,7 @@ check('ledger: other session not told', bg({'hook_event_name': 'PreToolUse', 'to
 r = bg({'hook_event_name': 'Stop', 'session_id': 'S1'})
 check('ledger: stop blocked once', r and r.get('decision') == 'block', r)
 check('ledger: second stop passes', bg({'hook_event_name': 'Stop', 'session_id': 'S1'}) is None)
-p = subprocess.run([os.path.join(CORE, 'bin', 'stuck-bg'), 'done', 'all'], capture_output=True, text=True, timeout=10, env=ENV)
+p = subprocess.run([os.path.join(CORE, 'scripts', 'stuck-bg'), 'done', 'all'], capture_output=True, text=True, timeout=10, env=ENV)
 check('ledger: stuck-bg done all', '0 entries left' in p.stdout, p.stdout + p.stderr)
 
 # ── agents
@@ -159,7 +165,7 @@ open(os.path.join(app, 'build.gradle.kts'), 'w').write('android {\n defaultConfi
 check('marionette: applicationId from build.gradle.kts', gm.android_package({'cwd': os.path.join(HOME, 'app')}) == 'com.example.app')
 
 # ── devctl ledger round trip (no device needed)
-dev = os.path.join(FLUTTER, 'bin', 'devctl')
+dev = os.path.join(FLUTTER, 'scripts', 'devctl')
 out = subprocess.run([dev, 'status'], capture_output=True, text=True, timeout=15, env=ENV).stdout
 check('devctl: empty status', 'no devices' in out, out)
 p = subprocess.run([dev, 'build', '--', 'true'], capture_output=True, text=True, timeout=15, env=ENV)

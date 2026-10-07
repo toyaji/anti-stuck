@@ -97,7 +97,7 @@ Your own limits go in a project's `.claude/command-timeouts.json` or `~/.anti-st
 - macOS or Linux, `python3`, `perl` (both preinstalled on macOS). Windows is not supported yet
 - Rules read the command text, so a word inside an unusual quoting form can still match. Rephrase the command if that happens
 - If a PreToolUse hook itself exceeds its timeout, Claude Code lets the tool run (documented behavior), so hooks only make quick checks
-- State and logs live in `~/.anti-stuck/` (override with `ANTI_STUCK_HOME`)
+- State, logs and the `devctl`/`stuck-bg` launchers live in `~/.anti-stuck/` (override with `ANTI_STUCK_HOME`); `tlimit` adds `~/.anti-stuck/bin` to `PATH` for every Bash command. Each plugin's own README lists exactly what it runs, reads, writes and kills
 
 ## License
 

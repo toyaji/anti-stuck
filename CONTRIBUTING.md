@@ -30,9 +30,10 @@ plugins/anti-stuck-<framework>/
 │   ├── command-timeouts.json         # {"rules": [{"pattern": "<regex>", "limit": <seconds>}]}
 │   ├── route-rules.json              # {"rules": [{"pattern": "<regex>", "unless": "<regex>", "message": "..."}]}
 │   └── reap-patterns.json            # {"patterns": [{"match": "<regex>", "orphan": true, "max_age": <s>, "reason": "..."}]}
-├── scripts/install_pack.sh           # copies pack/*.json to ~/.anti-stuck/packs/<framework>/
+├── scripts/install_pack.sh           # copies pack/*.json to ~/.anti-stuck/packs/<framework>/ (and writes tool launchers)
 ├── scripts/run.sh                    # copy of the core launcher, for any hook scripts of your own
-└── bin/                              # optional tools, on Claude's PATH while the pack is enabled
+├── README.md                         # 40+ words, and what the pack runs, reads, writes and kills
+└── LICENSE
 ```
 
 | File | The core uses it to |
@@ -45,7 +46,9 @@ Rules for packs:
 
 - **Do not add a PreToolUse hook on Bash that rewrites the command.** Only the core wraps commands; two wrappers conflict.
   Checks that only allow or deny (like the Flutter pack's Marionette guard) are fine.
-- Hook scripts run through `scripts/run.sh <script>` so a missing file never blocks every tool call.
+- Hook scripts run through `sh "${CLAUDE_PLUGIN_ROOT}/scripts/run.sh" "${CLAUDE_PLUGIN_ROOT}/scripts/<script>"` so a missing file never blocks every tool call.
+- No top-level `bin/` folder (claude.ai and Cowork refuse to install plugins that have one). Put tools in `scripts/` and have `install_pack.sh` write a launcher into `~/.anti-stuck/bin/`, which `tlimit` puts on `PATH` for every Bash command.
+- Each plugin folder needs its own `README.md` and `LICENSE` so it can be submitted to Anthropic's directory on its own.
 - Hooks must finish in a few seconds: if a PreToolUse hook times out, Claude Code runs the tool anyway.
 - Add the pack to `.claude-plugin/marketplace.json` and to the Packs table in `README.md`.
 - See `plugins/anti-stuck-flutter/` for a complete example.

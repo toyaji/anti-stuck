@@ -1,3 +1,3 @@
 #!/bin/sh
 # stuck-bg list | done <id>... | done all — inspect or clear the background-task ledger
-exec python3 "$(cd "$(dirname "$0")/.." && pwd)/scripts/bg_ledger.py" "$@"
+exec python3 "$(cd "$(dirname "$0")" && pwd)/bg_ledger.py" "$@"

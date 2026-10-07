@@ -18,7 +18,7 @@ import glob, hashlib, json, os, re, shlex, sys
 
 ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT') or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOME = os.environ.get('ANTI_STUCK_HOME') or os.path.expanduser('~/.anti-stuck')
-TLIMIT = os.path.join(ROOT, 'bin', 'tlimit')
+TLIMIT = os.path.join(ROOT, 'scripts', 'tlimit')
 LOG = os.path.join(HOME, 'logs', 'tlimit.log')
 DEFAULT, RETRY = 300, 1500
 LOG_ROTATE_BYTES = 5 * 1024 * 1024

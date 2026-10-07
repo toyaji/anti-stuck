@@ -1,0 +1,12 @@
+{
+  "name": "flutter-anti-stuck",
+  "description": "Plugins that keep Claude Code from getting stuck on Flutter work",
+  "owner": { "name": "toyaji" },
+  "plugins": [
+    {
+      "name": "flutter-anti-stuck",
+      "source": "./plugins/flutter-anti-stuck",
+      "description": "Hard time limits, fail-fast Marionette guards, a cross-session device ledger, and forced reporting for Flutter work in Claude Code"
+    }
+  ]
+}

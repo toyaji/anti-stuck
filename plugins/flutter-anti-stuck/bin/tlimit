@@ -1,0 +1,38 @@
+#!/usr/bin/perl
+# tlimit <seconds> <command> [key] — run a command in its own process group and kill the whole group at the deadline.
+# Every run's elapsed time is appended to $FAS_HOME/logs/tlimit.log (evidence for the timeout registry).
+use strict; use warnings; use POSIX qw(setpgid WNOHANG);
+use Digest::SHA qw(sha1_hex); use Time::HiRes qw(time); use File::Path qw(make_path);
+my ($secs, $cmd, $key) = @ARGV;
+die "usage: tlimit <seconds> <command> [key]\n" unless defined $cmd && $secs =~ /^\d+$/;
+$key //= sha1_hex($cmd);
+my $home = $ENV{FAS_HOME} || "$ENV{HOME}/.flutter-anti-stuck";
+make_path("$home/logs");
+my $log = "$home/logs/tlimit.log";
+sub note { open(my $f, '>>', $log) or return; my ($s) = @_; print $f $s; close $f; }
+my $shell = -x '/bin/zsh' ? '/bin/zsh' : '/bin/bash';
+my $start = time;
+my $pid = fork();
+die "fork: $!" unless defined $pid;
+if ($pid == 0) { setpgid(0, 0); exec($shell, '-c', $cmd) or exit 127; }
+setpgid($pid, $pid);
+my $killed = 0;
+local $SIG{ALRM} = sub {
+  $killed = 1; kill 'TERM', -$pid; sleep 3; kill 'KILL', -$pid;
+};
+local $SIG{TERM} = sub { kill 'TERM', -$pid; exit 143 };
+alarm $secs;
+waitpid($pid, 0); my $st = $?;
+alarm 0;
+my $el = sprintf('%.1f', time - $start);
+my $one = substr($cmd =~ s/\s+/ /gr, 0, 200);
+my $ts = POSIX::strftime('%F %T', localtime);
+my $cwd = $ENV{PWD} // '';
+if ($killed) {
+  note("$ts\tKILLED\t$secs\t$el\t$key\t$cwd\t$one\n");
+  print STDERR "\n[tlimit] killed at the ${secs}s limit. If this work is really needed, re-run the same command once with '# tlimit:1500' as its first line.\n";
+  exit 124;
+}
+my $rc = ($st & 127) ? 128 + ($st & 127) : $st >> 8;
+note("$ts\tDONE\t$secs\t$el\t$key\t$cwd\t$one\n");
+exit $rc;

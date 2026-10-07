@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Background-task ledger ($FAS_HOME/state/bg-ledger.json) — a session never loses track of work it started.
+"""Background-task ledger ($ANTI_STUCK_HOME/state/bg-ledger.json) — a session never loses track of work it started.
 
 - PostToolUse Bash(run_in_background) / Agent(background): record start and deadline (eta; default Bash 300 s, Agent 600 s)
 - SubagentStop: mark the Agent entry whose response mentions the agent_id as finished
 - PreToolUse(all tools): finished or overdue entries not yet reported -> inject "check and report now"
   (at most once per entry per 60 s)
 - Stop: finished or overdue unreported entries block the stop once so the model reports them
-- After reporting, the model clears entries with `fas-bg done <id>` (or `done all`). Entries older than 24 h expire
+- After reporting, the model clears entries with `stuck-bg done <id>` (or `done all`). Entries older than 24 h expire
 """
 import fcntl
 import json
@@ -15,7 +15,7 @@ import re
 import sys
 import time
 
-HOME = os.environ.get('FAS_HOME') or os.path.expanduser('~/.flutter-anti-stuck')
+HOME = os.environ.get('ANTI_STUCK_HOME') or os.path.expanduser('~/.anti-stuck')
 LEDGER = os.path.join(HOME, 'state', 'bg-ledger.json')
 DEFAULT_ETA = {'Bash': 300, 'Agent': 600}
 NAG_INTERVAL = 60
@@ -79,9 +79,9 @@ def post_tool_use(d):
             'finished': None, 'nagged': 0, 'blocked_stop': False,
         })
     emit({'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext':
-          f'[flutter-anti-stuck: background ledger] registered as {entry_id}, expected to finish by '
+          f'[anti-stuck: background ledger] registered as {entry_id}, expected to finish by '
           f'{time.strftime("%H:%M", time.localtime(now + eta))} (eta {eta} s). Tell the user that time. When it ends, '
-          f'report the result and run `fas-bg done {entry_id}`.'}})
+          f'report the result and run `stuck-bg done {entry_id}`.'}})
 
 
 def subagent_stop(d):
@@ -114,9 +114,9 @@ def pre_tool_use(d):
             i['nagged'] = time.time()
     if due:
         emit({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'additionalContext':
-              '[flutter-anti-stuck: background ledger] unreported work: ' + ' / '.join(describe(i) for i in due) +
+              '[anti-stuck: background ledger] unreported work: ' + ' / '.join(describe(i) for i in due) +
               '. Check its state now and tell the user (finished / failed / still running); clear finished ones with '
-              '`fas-bg done <id>`.'}})
+              '`stuck-bg done <id>`.'}})
 
 
 def stop(d):
@@ -126,9 +126,9 @@ def stop(d):
             i['blocked_stop'] = True
     if due:
         emit({'decision': 'block', 'reason':
-              '[flutter-anti-stuck: background ledger] background work was never reported: ' +
+              '[anti-stuck: background ledger] background work was never reported: ' +
               ' / '.join(describe(i) for i in due) +
-              '. Check it, tell the user in one line, clear finished entries with `fas-bg done <id>`, then stop.'})
+              '. Check it, tell the user in one line, clear finished entries with `stuck-bg done <id>`, then stop.'})
 
 
 def cli(args):
@@ -146,7 +146,7 @@ def cli(args):
         if not items:
             print('ledger is empty')
     else:
-        sys.exit('usage: fas-bg list | done <id>... | done all')
+        sys.exit('usage: stuck-bg list | done <id>... | done all')
 
 
 def main():

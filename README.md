@@ -1,31 +1,49 @@
-# Flutter Anti-Stuck
+# Anti-Stuck
 
-**A stuck agent is worse than a failed one.** This Claude Code plugin makes sure that, during Flutter work,
-Claude never waits forever on a command, a device, a Marionette call or a subagent — and always tells you
-when long or background work ends.
+**A stuck agent is worse than a failed one.** A failed command tells you something went wrong.
+A stuck one burns your afternoon while you wait for a result that already arrived — or never will.
 
-Built after one day in which a Marionette `connect` hung for 10 minutes, a finished deploy went unreported
-for 17 minutes, and two sessions fought over the same phone.
+Anti-Stuck is a Claude Code plugin that makes sure Claude never waits forever on a command, a tool,
+a device or a subagent, and always tells you when long or background work ends.
+Framework **packs** add rules for their own ecosystems — the first one is for Flutter.
 
-## What it does
+## Why it exists
+
+All of these happened on one ordinary day of Flutter work with Claude Code:
+
+- A Marionette MCP `connect` hung for **10 minutes**. MCP calls are outside the Bash timeout, and the default idle limit for a stdio MCP server is 30 minutes.
+- A deploy-and-poll loop finished in 3 minutes, but Claude never said so. The user found out **17 minutes later**.
+- A `flutter run` in the background was killed by a timeout, and nobody noticed until a notification arrived.
+- Two sessions built for the same phone at once, and both builds failed.
+
+None of these are bugs in a single command. They are **missing limits and missing reports**, and they are everywhere.
+
+## What the core does (`anti-stuck`)
 
 | Problem | What the plugin does |
 |---|---|
-| A Bash command hangs (build, test, `adb`, a polling loop) | Every Bash call runs inside `tlimit`, which kills the whole process group at the limit (300 s default, Flutter defaults in `config/command-timeouts.json`) |
+| A Bash command hangs | Every Bash call runs inside `tlimit`, which kills the whole process group at the limit (300 s default) |
 | Long commands start with no idea how long they take | Commands allowed more than 300 s must start with `# eta:<seconds> <what>`; the limit becomes `min(registry, eta × 2)` |
 | One network call inside a loop hangs the whole loop | Denied: `curl` without `--max-time`, `aws` without `--cli-read-timeout`, `gh … --watch`, `sleep ≥ 60`, `setsid`/`nohup`/`disown`, `while true`, and `while`/`until` without a visible bound |
-| Work finishes and Claude silently moves on | After a call over 60 s, a wait loop, a 20 s+ MCP call, a kill, or a subagent run, Claude is told to report on the first line of its next reply |
-| Background work is forgotten | A ledger tracks every background Bash/Agent; overdue or finished entries are pushed back to Claude on every tool call, and an unreported one blocks the stop once (`fas-bg list` / `fas-bg done <id>`) |
-| Marionette MCP hangs when the app is backgrounded or the previous connection is paused | The VM is checked in 3 s before each call, a paused previous connection blocks `connect`, and Android apps must be in the foreground |
-| Several sessions share one phone, emulator or build machine | `devctl` keeps a shared ledger: `status`, `run`, `exec`, `build` (one at a time), `wait`, `release` (keeps the app running for the next session), `stop` |
-| Runaway processes | Orphaned / 30 min+ `flutter_tester` and 5 min+ whole-disk searches are killed when a session stops |
-| Subagents run for an hour | Elapsed time is shown on every subagent tool call; past the limit (10 min default) tools are denied so it reports and stops |
+| Work finishes and Claude silently moves on | After a call over 60 s, a wait loop, an MCP call over 20 s, a kill, or a subagent run, Claude is told to report on the first line of its next reply |
+| Background work is forgotten | A ledger tracks every background Bash/Agent call; overdue or finished entries are pushed back to Claude on every tool call, and an unreported one blocks the stop once (`stuck-bg list`, `stuck-bg done <id>`) |
+| Subagents run for an hour | Elapsed time is shown on every subagent tool call; past the limit (10 min default) its tools are denied, so it reports and stops |
+| Runaway processes | Whole-disk searches older than 5 min (plus pack patterns) are killed when a session stops |
+| A broken hook blocks everything | Hooks run through a launcher that lets tools through if a hook script is missing, instead of blocking every call |
+
+## Packs
+
+| Pack | What it adds |
+|---|---|
+| [`anti-stuck-flutter`](plugins/anti-stuck-flutter) | `devctl` — a ledger that lets sessions share real devices, emulators and heavy builds (`status`, `run`, `exec`, `build`, `wait`, `release`, `stop`); fail-fast Marionette MCP guards; Flutter build/test time limits; routing `flutter run`/`adb`/`emulator` through `devctl`; `flutter_tester` cleanup |
+| *your framework here* | Xcode, Android/Gradle, Docker, Node, Rust, Python… see [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ## Install
 
 ```bash
-claude plugin marketplace add toyaji/flutter-anti-stuck
-claude plugin install flutter-anti-stuck@flutter-anti-stuck
+claude plugin marketplace add toyaji/anti-stuck
+claude plugin install anti-stuck@anti-stuck
+claude plugin install anti-stuck-flutter@anti-stuck   # optional, Flutter pack (installs the core too)
 ```
 
 Then add the MCP limits that a plugin cannot set for you. In `~/.claude/settings.json`:
@@ -40,55 +58,46 @@ Then add the MCP limits that a plugin cannot set for you. In `~/.claude/settings
 }
 ```
 
-and give the Marionette server a hard per-call limit in your project's `.mcp.json`:
+and give slow-to-fail MCP servers a hard per-call limit in `.mcp.json`, for example:
 
 ```json
 { "mcpServers": { "marionette": { "type": "stdio", "command": "marionette_mcp", "timeout": 60000 } } }
 ```
 
-Without these, a hung stdio MCP server is only cut after **30 minutes** (Claude Code's default idle limit).
+Without these, a hung stdio MCP server is only cut after **30 minutes**.
 
 ## Daily use
 
 ```bash
-devctl status                                  # who uses which device, app build, Marionette address
-devctl run <device-id> --dart-define=STAGE=dev  # take the device and start the app (reuses it if already up)
-devctl exec <device-id> -- adb -s <device-id> exec-out screencap -p > shot.png
-devctl build -- flutter build apk               # one heavy build at a time across sessions
-devctl release <device-id>                     # hand back; the app stays up for the next session
-fas-bg list                                    # background work this plugin is tracking
+stuck-bg list                                   # background work being tracked
+# eta:400 release apk build                     # Claude writes this line itself for long commands
+devctl build -- flutter build apk --release     # (Flutter pack) one heavy build at a time across sessions
+devctl status                                   # (Flutter pack) who uses which device, app build, Marionette address
 ```
 
-Long command example — Claude writes this itself once the plugin is on:
-
-```bash
-# eta:400 release apk build
-devctl build -- flutter build apk --release
-```
-
-Project-specific limits go in `.claude/command-timeouts.json`:
+Your own limits go in a project's `.claude/command-timeouts.json` or `~/.anti-stuck/command-timeouts.json`:
 
 ```json
 { "rules": [ { "pattern": "melos run e2e", "limit": 1200 } ] }
 ```
 
-## Options
+## 🧯 Share your stuck
 
-Set in `/plugin` → flutter-anti-stuck → configure, or `/config`:
+**Everyone using an AI coding agent gets stuck — in different places.** This project only gets better with your cases.
 
-| Option | Default | Meaning |
-|---|---|---|
-| `agent_limit_minutes` | 10 | Subagent time limit |
-| `require_foreground_agents` | true | Deny background Agent calls |
-| `allow_background` | false | Allow background Bash without the user asking |
-| `android_package` | auto | Android `applicationId` for the foreground check |
+- **Got stuck?** Open a [Stuck report](https://github.com/toyaji/anti-stuck/issues/new?template=stuck-report.md): what hung, for how long, why nobody noticed, and how to reproduce it. Even without a fix, a well-described case helps the next person.
+- **Have a fix?** Turn it into a rule and send a pull request:
+  - a general rule (a command that needs a timeout flag, a new kind of hang) → the core
+  - a rule for your language or framework → a pack folder under `plugins/anti-stuck-<framework>/`
+  [CONTRIBUTING.md](CONTRIBUTING.md) shows how; most packs are three JSON files.
+- Collected cases live in [docs/stuck-cases.md](docs/stuck-cases.md).
 
 ## Requirements and limits
 
-- macOS or Linux, `python3`, `perl` (both preinstalled on macOS). Windows is not supported
-- Rules read command text, so a word inside a string can match. Rephrase the command if that happens
-- If a PreToolUse hook itself exceeds its timeout, Claude Code lets the tool run (documented behavior), so hooks only make 3 s network checks
-- State and logs live in `~/.flutter-anti-stuck/` (override with `FAS_HOME`)
+- macOS or Linux, `python3`, `perl` (both preinstalled on macOS). Windows is not supported yet
+- Rules read the command text, so a word inside an unusual quoting form can still match. Rephrase the command if that happens
+- If a PreToolUse hook itself exceeds its timeout, Claude Code lets the tool run (documented behavior), so hooks only make quick checks
+- State and logs live in `~/.anti-stuck/` (override with `ANTI_STUCK_HOME`)
 
 ## License
 

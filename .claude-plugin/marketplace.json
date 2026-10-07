@@ -1,12 +1,17 @@
 {
-  "name": "flutter-anti-stuck",
-  "description": "Plugins that keep Claude Code from getting stuck on Flutter work",
+  "name": "anti-stuck",
+  "description": "Keep Claude Code from getting stuck: a core plugin plus framework packs",
   "owner": { "name": "toyaji" },
   "plugins": [
     {
-      "name": "flutter-anti-stuck",
-      "source": "./plugins/flutter-anti-stuck",
-      "description": "Hard time limits, fail-fast Marionette guards, a cross-session device ledger, and forced reporting for Flutter work in Claude Code"
+      "name": "anti-stuck",
+      "source": "./plugins/anti-stuck",
+      "description": "Core: hard time limits on every Bash call, eta declarations, per-call limit rules, forced reporting, background ledger, subagent budgets"
+    },
+    {
+      "name": "anti-stuck-flutter",
+      "source": "./plugins/anti-stuck-flutter",
+      "description": "Flutter pack: devctl device/emulator/build ledger across sessions, fail-fast Marionette MCP guards, Flutter time limits"
     }
   ]
 }

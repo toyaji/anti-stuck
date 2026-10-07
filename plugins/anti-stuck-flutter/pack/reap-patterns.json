@@ -1,0 +1,6 @@
+{
+  "_doc": "Runaway Flutter processes the core reaper may kill when a session or subagent stops.",
+  "patterns": [
+    {"match": "flutter_tester", "orphan": true, "max_age": 1800, "reason": "orphaned or 30 min+ flutter_tester"}
+  ]
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """devctl — share real devices, emulators and heavy builds between Claude Code sessions through one ledger.
 
-Ledger: $FAS_HOME/state/devices/ledger.json (default ~/.flutter-anti-stuck; shared by every session, file-locked)
+Ledger: $ANTI_STUCK_HOME/state/devices/ledger.json (default ~/.anti-stuck; shared by every session, file-locked)
 Session identity: the Claude Code process that called this command. When it dies, its ownership is released.
 
   devctl status                         who uses what, waiters, app build (branch@commit) and Marionette address
@@ -24,7 +24,7 @@ import subprocess
 import sys
 import time
 
-HOME = os.environ.get('FAS_HOME') or os.path.expanduser('~/.flutter-anti-stuck')
+HOME = os.environ.get('ANTI_STUCK_HOME') or os.path.expanduser('~/.anti-stuck')
 STATE = os.path.join(HOME, 'state', 'devices')
 LEDGER = os.path.join(STATE, 'ledger.json')
 LOCK = os.path.join(STATE, 'ledger.lock')

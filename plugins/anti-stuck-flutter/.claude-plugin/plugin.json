@@ -1,0 +1,20 @@
+{
+  "name": "anti-stuck-flutter",
+  "displayName": "Anti-Stuck for Flutter",
+  "version": "0.2.0",
+  "description": "Flutter pack for anti-stuck: devctl, a cross-session ledger for real devices, emulators and heavy builds; fail-fast Marionette MCP guards; Flutter build/test time limits; flutter_tester runaway cleanup.",
+  "author": { "name": "toyaji" },
+  "homepage": "https://github.com/toyaji/anti-stuck",
+  "repository": "https://github.com/toyaji/anti-stuck",
+  "license": "MIT",
+  "keywords": ["flutter", "dart", "marionette", "devices", "emulator", "adb", "timeout", "stuck"],
+  "dependencies": ["anti-stuck"],
+  "userConfig": {
+    "android_package": {
+      "type": "string",
+      "title": "Android applicationId override",
+      "description": "Leave empty to read applicationId from android/app/build.gradle(.kts) of the app devctl started.",
+      "default": ""
+    }
+  }
+}

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""PreToolUse(all tools) · SubagentStop — device commands go through devctl; background work and subagents stay bounded.
+"""PreToolUse(all tools) · SubagentStop — background work and subagents stay bounded and reported.
 
-- Bash commands that use a device, an emulator or a heavy build must go through devctl (shared ledger across sessions)
 - Bash run_in_background is denied unless the user's last message asked for background work
   (plugin option allow_background = true turns this off)
 - Agent must be called with run_in_background: false (plugin option require_foreground_agents = false turns this off)
@@ -15,7 +14,7 @@ import re
 import sys
 import time
 
-HOME = os.environ.get('FAS_HOME') or os.path.expanduser('~/.flutter-anti-stuck')
+HOME = os.environ.get('ANTI_STUCK_HOME') or os.path.expanduser('~/.anti-stuck')
 CLOCK_DIR = os.path.join(HOME, 'state', 'agent-clock')
 LOG = os.path.join(HOME, 'logs', 'subagents.log')
 
@@ -31,16 +30,6 @@ def flag(name, default):
 
 AGENT_LIMIT_SEC = int(float(option('agent_limit_minutes', 10)) * 60)
 BG_REQUEST = re.compile(r'background|백그라운드', re.IGNORECASE)
-
-DEVICE_CMD = re.compile(
-    r'\bflutter\s+(run|attach|install|drive|build)\b|\bflutter\s+test\b[^\n;&|]*integration_test'
-    r'|\bflutter\s+emulators\s+--launch\b|\bpatrol\s+(test|develop|build)\b|\bfastlane\b'
-    r'|\bgradlew\b[^\n;&|]*\b(assemble|install|bundle)'
-    r'|\badb\b[^\n;&|]*\b(install|uninstall|reboot|emu|kill-server|shell\s+(am|pm|input|monkey))\b'
-    r'|(^|[\s;&|(])emulator\s+-avd\b'
-    r'|\bxcrun\s+simctl\s+(boot|shutdown|install|uninstall|launch|terminate|erase)\b'
-    r'|\b(pkill|killall)\b[^\n;&|]*(flutter|dart|emulator|qemu|adb|Simulator|gradle)')
-DEVCTL = re.compile(r'^\s*(#[^\n]*\n\s*)*(\S*/)?devctl\b')
 
 
 def emit(obj):
@@ -82,16 +71,6 @@ def clock_path(agent_id):
 def pre_tool_use(data):
     tool = data.get('tool_name')
     inp = data.get('tool_input') or {}
-
-    if tool == 'Bash':
-        cmd = inp.get('command', '')
-        unquoted = re.sub(r"'[^']*'|\"[^\"]*\"", "''", cmd)
-        if DEVICE_CMD.search(unquoted) and not DEVCTL.match(cmd):
-            deny('Devices, emulators and heavy builds are shared between sessions through the devctl ledger. '
-                 'Run `devctl status` first, then `devctl run <device> [flutter run args]`, `devctl exec <device> -- <cmd>`, '
-                 '`devctl build -- <cmd>` or `devctl emu <avd>`. If another session owns the device, '
-                 '`devctl wait <device> "purpose"`; when done, `devctl release <device>`. '
-                 'Never kill other sessions\' apps or emulators (pkill etc.).')
 
     if tool == 'Bash' and inp.get('run_in_background') is True and not flag('allow_background', False):
         if not BG_REQUEST.search(last_user_text(data.get('transcript_path'))):

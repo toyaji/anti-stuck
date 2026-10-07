@@ -1,11 +1,13 @@
 {
-  "name": "flutter-anti-stuck",
-  "displayName": "Flutter Anti-Stuck",
-  "version": "0.1.0",
-  "description": "Claude Code never waits forever on Flutter work: hard time limits on every Bash call, fail-fast Marionette MCP guards, a cross-session device/build ledger (devctl), and forced reporting when long or background work ends.",
+  "name": "anti-stuck",
+  "displayName": "Anti-Stuck",
+  "version": "0.2.0",
+  "description": "Claude Code never waits forever: process-group time limits on every Bash call, eta declarations, per-call limit rules, forced reporting when long or background work ends, and subagent time budgets. Framework packs (e.g. anti-stuck-flutter) add their own rules.",
   "author": { "name": "toyaji" },
+  "homepage": "https://github.com/toyaji/anti-stuck",
+  "repository": "https://github.com/toyaji/anti-stuck",
   "license": "MIT",
-  "keywords": ["flutter", "dart", "marionette", "timeout", "hooks", "devices", "emulator", "stuck"],
+  "keywords": ["timeout", "hooks", "stuck", "hang", "background", "subagent", "reliability"],
   "userConfig": {
     "agent_limit_minutes": {
       "type": "number",
@@ -26,12 +28,6 @@
       "title": "Allow background Bash without asking",
       "description": "When off, run_in_background Bash is only allowed if your last message asked for background work.",
       "default": false
-    },
-    "android_package": {
-      "type": "string",
-      "title": "Android applicationId override",
-      "description": "Leave empty to read applicationId from android/app/build.gradle(.kts) of the app devctl started.",
-      "default": ""
     }
   }
 }

@@ -1,5 +1,5 @@
 {
-  "_doc": "Default Bash timeout registry for Flutter work. Commands not matched here get 300 s. Extend per project in .claude/command-timeouts.json, or for all projects in ~/.flutter-anti-stuck/command-timeouts.json. Any limit above 300 s requires a '# eta:<seconds> <what>' first line, and the effective limit becomes min(registry, eta x 2).",
+  "_doc": "Flutter time limits. Installed into ~/.anti-stuck/packs/flutter/ at session start; the anti-stuck core reads it.",
   "rules": [
     {"pattern": "devctl (run|emu|exec|build)", "limit": 1500},
     {"pattern": "flutter build (apk|appbundle|web)", "limit": 900},

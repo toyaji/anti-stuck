@@ -15,7 +15,7 @@ import subprocess
 import sys
 import urllib.request
 
-HOME = os.environ.get('FAS_HOME') or os.path.expanduser('~/.flutter-anti-stuck')
+HOME = os.environ.get('ANTI_STUCK_HOME') or os.path.expanduser('~/.anti-stuck')
 STATE = os.path.join(HOME, 'state', 'marionette_last_uri')
 LEDGER = os.path.join(HOME, 'state', 'devices', 'ledger.json')
 TIMEOUT = 3
@@ -23,7 +23,7 @@ IOS_UDID = re.compile(r'[0-9A-F]{8}-[0-9A-F]{16}|[0-9A-F]{8}-([0-9A-F]{4}-){3}[0
 
 
 def block(msg):
-    print(f'[flutter-anti-stuck: marionette] {msg}', file=sys.stderr)
+    print(f'[anti-stuck: marionette] {msg}', file=sys.stderr)
     sys.exit(2)
 
 

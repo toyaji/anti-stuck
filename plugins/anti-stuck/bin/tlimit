@@ -1,12 +1,12 @@
 #!/usr/bin/perl
 # tlimit <seconds> <command> [key] — run a command in its own process group and kill the whole group at the deadline.
-# Every run's elapsed time is appended to $FAS_HOME/logs/tlimit.log (evidence for the timeout registry).
+# Every run's elapsed time is appended to $ANTI_STUCK_HOME/logs/tlimit.log (evidence for the timeout registry).
 use strict; use warnings; use POSIX qw(setpgid WNOHANG);
 use Digest::SHA qw(sha1_hex); use Time::HiRes qw(time); use File::Path qw(make_path);
 my ($secs, $cmd, $key) = @ARGV;
 die "usage: tlimit <seconds> <command> [key]\n" unless defined $cmd && $secs =~ /^\d+$/;
 $key //= sha1_hex($cmd);
-my $home = $ENV{FAS_HOME} || "$ENV{HOME}/.flutter-anti-stuck";
+my $home = $ENV{ANTI_STUCK_HOME} || "$ENV{HOME}/.anti-stuck";
 make_path("$home/logs");
 my $log = "$home/logs/tlimit.log";
 sub note { open(my $f, '>>', $log) or return; my ($s) = @_; print $f $s; close $f; }

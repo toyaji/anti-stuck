@@ -64,7 +64,7 @@ def main():
 
     if not reasons:
         return
-    msg = (f'[flutter-anti-stuck: report now] {tool}: ' + '; '.join(reasons) +
+    msg = (f'[anti-stuck: report now] {tool}: ' + '; '.join(reasons) +
            '. Before any other tool call, tell the user in one line what this produced and how long it took.')
     print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': msg}}))
 

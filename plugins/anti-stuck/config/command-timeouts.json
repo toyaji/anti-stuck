@@ -1,0 +1,4 @@
+{
+  "_doc": "Core timeout registry. Commands that match no rule anywhere get 300 s. Packs add rules in ~/.anti-stuck/packs/<pack>/command-timeouts.json; you can add your own in ~/.anti-stuck/command-timeouts.json or a project's .claude/command-timeouts.json. Any limit above 300 s requires a '# eta:<seconds> <what>' first line, and the effective limit becomes min(registry, eta x 2).",
+  "rules": []
+}

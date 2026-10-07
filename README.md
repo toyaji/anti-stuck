@@ -35,7 +35,7 @@ None of these are bugs in a single command. They are **missing limits and missin
 
 | Pack | What it adds |
 |---|---|
-| [`anti-stuck-flutter`](plugins/anti-stuck-flutter) | `devctl` (with a **devctl** skill) — a ledger that lets sessions share real devices, emulators and heavy builds (`status`, `run`, `exec`, `build`, `wait`, `release`, `stop`); fail-fast Marionette MCP guards; Flutter build/test time limits; routing `flutter run`/`adb`/`emulator` through `devctl`; `flutter_tester` cleanup |
+| [`anti-stuck-flutter`](plugins/anti-stuck-flutter) | `devctl` (with a **devctl** skill) — a ledger that lets sessions share real devices, emulators and heavy builds (`status`, `run`, `exec`, `build`, `wait`, `release`, `stop`); waiting sessions are woken the moment a device is free; fail-fast Marionette MCP guards; Flutter build/test time limits; routing `flutter run`/`adb`/`emulator` through `devctl`; `flutter_tester` cleanup |
 | *your framework here* | Xcode, Android/Gradle, Docker, Node, Rust, Python… see [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ## Install

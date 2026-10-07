@@ -177,6 +177,59 @@ check('devctl: empty status', 'no devices' in out, out)
 p = subprocess.run([dev, 'build', '--', 'true'], capture_output=True, text=True, timeout=15, env=ENV)
 check('devctl: build runs and auto-releases', p.returncode == 0 and 'released' in p.stdout, p.stdout + p.stderr)
 
+# ── devctl: release frees the device; every waiter is woken; first to take it wins
+fake = [subprocess.Popen(['sleep', '60']) for _ in range(3)]  # stand-ins for three Claude sessions
+A, B, C = (str(f.pid) for f in fake)
+def as_session(pid, *args):
+    return subprocess.run([dev, *args], capture_output=True, text=True, timeout=15, env={**ENV, 'ANTI_STUCK_SESSION_PID': pid})
+def ledger_dev(key):
+    return json.load(open(os.path.join(HOME, 'state', 'devices', 'ledger.json')))['devices'].get(key)
+as_session(A, 'exec', 'phone1', '--', 'true')
+check('devctl: A owns phone1', ledger_dev('phone1')['owner']['pid'] == int(A))
+p = as_session(B, 'exec', 'phone1', '--', 'true')
+check('devctl: B is refused while A owns it', p.returncode != 0 and 'wait' in (p.stdout + p.stderr))
+p = as_session(B, 'wait', 'phone1', 'busy elsewhere'); as_session(C, 'wait', 'phone1', 'blocked')
+check('devctl: B and C are waiting', len(ledger_dev('phone1')['waiters']) == 2, p.stdout)
+
+watch = os.path.join(FLUTTER, 'scripts', 'wait_watch.py')
+WAIT_PAYLOAD = json.dumps({'tool_name': 'Bash', 'tool_input': {'command': f"{dev} wait phone1 'x'"}, 'tool_response': 'waiting'})
+def start_watch(extra=None):
+    w = subprocess.Popen(['sh', os.path.join(FLUTTER, 'scripts', 'run.sh'), watch], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                         env={**ENV, 'CLAUDE_PLUGIN_ROOT': FLUTTER, **(extra or {})})
+    w.stdin.write(WAIT_PAYLOAD)
+    w.stdin.close()
+    return w
+def finish(w, timeout):
+    try:
+        w.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        w.kill(); w.wait()
+    return w.returncode, w.stderr.read()
+wB, wC = start_watch(), start_watch()
+time.sleep(3)
+check('watch: still waiting while A owns it', wB.poll() is None and wC.poll() is None)
+as_session(A, 'release', 'phone1')
+rB, eB = finish(wB, 10); rC, eC = finish(wC, 10)
+check('watch: both waiters woken with exit 2 on release', rB == 2 and rC == 2, (rB, rC))
+check('watch: wake message says free and names devctl path', all('phone1 is free' in e and dev in e for e in (eB, eC)), eB[:200])
+p = as_session(C, 'exec', 'phone1', '--', 'true')
+check('devctl: first to take it (C) gets it', p.returncode == 0 and ledger_dev('phone1')['owner']['pid'] == int(C), p.stdout + p.stderr)
+p = as_session(B, 'exec', 'phone1', '--', 'true')
+check('devctl: the later one (B) is refused and told to wait', p.returncode != 0 and 'wait' in (p.stdout + p.stderr))
+check('devctl: B stays on the waiters list', [w['pid'] for w in ledger_dev('phone1')['waiters']] == [int(B)])
+r, e = finish(start_watch({'ANTI_STUCK_WATCH_SEC': '3'}), 15)
+check('watch: gives up and wakes after its deadline (never waits forever)', r == 2 and 'still in use' in e, e[:200])
+fake[2].kill(); fake[2].wait()
+r, e = finish(start_watch(), 10)
+check('watch: owner session died -> device counts as free', r == 2 and 'is free' in e, e[:200])
+rc, _, _ = hook(FLUTTER, 'wait_watch.py', {'tool_name': 'Bash', 'tool_input': {'command': 'ls'}, 'tool_response': 'x'})
+check('watch: other commands exit 0 at once', rc == 0)
+rc, _, _ = hook(FLUTTER, 'wait_watch.py', {'tool_name': 'Bash', 'tool_input': {'command': f'{dev} wait phone9'}, 'tool_response': 'phone9: nobody is using it. Use it directly.'})
+check('watch: nothing to wait for -> exit 0', rc == 0)
+for f in fake:
+    f.kill()
+
 shutil.rmtree(HOME, ignore_errors=True)
 print(f'\n{"ALL PASS" if fails == 0 else f"{fails} FAILED"}')
 sys.exit(1 if fails else 0)

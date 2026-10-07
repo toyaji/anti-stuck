@@ -10,8 +10,9 @@ Session identity: the Claude Code process that called this command. When it dies
   devctl exec <device> -- <command>     take the device and run a command (integration test, adb install, ...)
   devctl emu <avd>                      boot an emulator and take it
   devctl build -- <command>             heavy build, one at a time across sessions; released when it ends
-  devctl wait <device> [purpose]        join the wait list of a device another session is using
-  devctl release <device>               release ownership only. The app keeps running (handed to the next waiter, or left free)
+  devctl wait <device> [purpose]        join the waiters of a device another session is using. A hook wakes this
+                                        session as soon as the device is free; the first waiter to take it gets it
+  devctl release <device>               release ownership only. The app keeps running and the device becomes free
   devctl release-all                    release every device this session holds (the Stop hook calls this). Apps keep running
   devctl stop <device>                  stop the app (and an emulator devctl started) and remove it. Not allowed on someone else's device
 """
@@ -37,6 +38,9 @@ DEVCTL = os.path.abspath(__file__)  # messages give Claude the exact path to cal
 # ───── session · ledger ─────
 
 def session():
+    forced = os.environ.get('ANTI_STUCK_SESSION_PID')  # tests: act as another session
+    if forced:
+        return {'pid': int(forced), 'label': f'pid{forced}', 'cwd': os.getcwd()}
     pid = os.getpid()
     for _ in range(12):
         out = subprocess.run(['ps', '-o', 'ppid=,command=', '-p', str(pid)], capture_output=True, text=True).stdout.strip()
@@ -96,8 +100,8 @@ class Ledger:
                 d['app'] = None
             owner = d.get('owner')
             if owner and not alive(owner['pid']):
-                hand_off_or_clear(self, key, reason='owner session ended')
-            elif not owner and time.time() - d.get('free_at', time.time()) > FREE_APP_TTL_SEC:
+                free_device(self, key)
+            elif not owner and not d['waiters'] and time.time() - d.get('free_at', time.time()) > FREE_APP_TTL_SEC:
                 kill_device(self, key)
 
 
@@ -150,25 +154,21 @@ def stop_app(app):
             pass
 
 
-def hand_off_or_clear(led, key, reason):
-    """Release ownership only. Apps and emulators keep running — the next waiter gets them, otherwise they stay free."""
+def free_device(led, key):
+    """Release ownership only. Apps and emulators keep running and the device becomes free. Waiters are not handed
+    the device: their wait_watch hooks see it free and wake them, and the first one to take it gets it."""
     d = led.devices[key]
-    waiters = d.get('waiters', [])
-    if waiters:
-        nxt = waiters.pop(0)
-        d['owner'] = {k: nxt[k] for k in ('pid', 'label', 'cwd')}
-        d['purpose'] = nxt.get('purpose')
-        d['since'] = now()
-        d['handoff'] = f"{now()} {reason} -> handed to {nxt['label']} (app kept)"
-        return f"{key}: handed to waiter {nxt['label']}. The app was not stopped — continue through its Marionette address."
     d['owner'] = None
     d['purpose'] = None
     d['free_since'] = now()
     d['free_at'] = time.time()
-    if not d.get('app') and not d.get('emulator_pid'):
+    if not d.get('app') and not d.get('emulator_pid') and not d.get('waiters'):
         del led.devices[key]
         return f"{key}: released (no app running)."
-    return f"{key}: ownership released, app left running as free (reused if someone runs it again, cleaned up after {FREE_APP_TTL_SEC // 60} min unused)."
+    waiting = len(d.get('waiters', []))
+    note = f' {waiting} waiting session(s) are being woken; the first to take it gets it.' if waiting else ''
+    return (f"{key}: released. The app keeps running and the device is free (cleaned up after "
+            f"{FREE_APP_TTL_SEC // 60} min unused).{note}")
 
 
 def kill_device(led, key):
@@ -189,7 +189,8 @@ def take(led, key, me, purpose):
     d = led.devices.get(key)
     if d and d.get('owner') and d['owner']['pid'] != me['pid']:
         return None, (describe(key, d, me) + f"\n-> Another session is using it. Do not stop it or start a new app — "
-                      f"`{DEVCTL} wait {key} \"purpose\"` to join the wait list, then continue through the Marionette address above.")
+                      f"`{DEVCTL} wait {key} \"purpose\"`. This session is woken as soon as the device is free; "
+                      "then take it right away if you will use it now.")
     if not d:
         d = led.devices[key] = {'owner': None, 'purpose': purpose, 'since': now(), 'app': None, 'waiters': []}
     if not d.get('owner'):
@@ -229,7 +230,8 @@ def cmd_wait(args, me):
         if not any(w['pid'] == me['pid'] for w in d['waiters']):
             d['waiters'].append({**{k: me[k] for k in ('pid', 'label', 'cwd')}, 'purpose': purpose, 'since': now()})
         pos = [w['pid'] for w in d['waiters']].index(me['pid']) + 1
-        print(describe(key, d, me) + f'\n-> waiting, position {pos}. When it is handed over, {DEVCTL} status shows me as owner.')
+        print(describe(key, d, me) + f'\n-> waiting ({pos} of {len(d["waiters"])}). This session will be woken when {key} is free; '
+              'you can keep working on something else or stop until then. When woken, take it only if you will use it now.')
 
 
 def cmd_release(args, me):
@@ -244,7 +246,7 @@ def cmd_release(args, me):
             return
         if d['owner']['pid'] != me['pid']:
             sys.exit(f"{key}: owned by {d['owner']['label']}. You cannot release someone else's device.")
-        print(hand_off_or_clear(led, key, reason='released by owner'))
+        print(free_device(led, key))
 
 
 def cmd_stop(args, me):
@@ -257,7 +259,7 @@ def cmd_stop(args, me):
         if d.get('owner') and d['owner']['pid'] != me['pid']:
             sys.exit(f"{key}: {d['owner']['label']} is using it, so it cannot be stopped. `{DEVCTL} wait {key}` instead.")
         if d.get('waiters'):
-            sys.exit(f"{key}: sessions are waiting for it, so it is not stopped. `{DEVCTL} release {key}` to hand it over.")
+            sys.exit(f"{key}: sessions are waiting for it, so it is not stopped. `{DEVCTL} release {key}` frees it for them.")
         print(kill_device(led, key))
 
 
@@ -265,7 +267,7 @@ def cmd_release_all(_args, me):
     with Ledger() as led:
         mine = [k for k, d in led.devices.items() if d.get('owner') and d['owner']['pid'] == me['pid']]
         for key in mine:
-            print(hand_off_or_clear(led, key, reason='session idle, auto release'))
+            print(free_device(led, key))
 
 
 def cmd_send(args, me, key_char):
@@ -344,7 +346,7 @@ def cmd_exec(args, me, auto_release=False):
     if auto_release:
         with Ledger() as led:
             if key in led.devices and led.devices[key].get('owner') and led.devices[key]['owner']['pid'] == me['pid']:
-                print(hand_off_or_clear(led, key, reason='build finished'))
+                print(free_device(led, key))
     sys.exit(code)
 
 

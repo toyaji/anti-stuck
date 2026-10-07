@@ -35,7 +35,7 @@ None of these are bugs in a single command. They are **missing limits and missin
 
 | Pack | What it adds |
 |---|---|
-| [`anti-stuck-flutter`](plugins/anti-stuck-flutter) | `devctl` (with a **devctl** skill) — a ledger that lets sessions share real devices, emulators and heavy builds (`status`, `run`, `exec`, `build`, `wait`, `release`, `stop`); waiting sessions are woken the moment a device is free; fail-fast Marionette MCP guards; Flutter build/test time limits; routing `flutter run`/`adb`/`emulator` through `devctl`; `flutter_tester` cleanup |
+| [`anti-stuck-flutter`](plugins/anti-stuck-flutter) | `anti-stuck-flutter` command (with a **device-ledger** skill) — a ledger that lets sessions share real devices, emulators and heavy builds (`status`, `run`, `exec`, `build`, `wait`, `release`, `stop`); waiting sessions are woken the moment a device is free; fail-fast Marionette MCP guards; Flutter build/test time limits; routing `flutter run`/`adb`/`emulator` through it; `flutter_tester` cleanup |
 | *your framework here* | Xcode, Android/Gradle, Docker, Node, Rust, Python… see [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ## Install
@@ -68,12 +68,12 @@ Without these, a hung stdio MCP server is only cut after **30 minutes**.
 
 ## Daily use
 
-Claude gets two skills that carry the exact command paths: **background-ledger** (core) and **devctl** (Flutter pack).
+Claude gets two skills that carry the exact command paths: **background-ledger** (core) and **device-ledger** (Flutter pack).
 Long commands start with an eta line, which Claude writes itself:
 
 ```bash
 # eta:400 release apk build
-<path to devctl> build -- flutter build apk --release
+<path to anti-stuck-flutter> build -- flutter build apk --release
 ```
 
 Your own limits go in a project's `.claude/command-timeouts.json` or `~/.anti-stuck/command-timeouts.json`:

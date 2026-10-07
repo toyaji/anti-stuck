@@ -2,7 +2,7 @@
 """PreToolUse(mcp__marionette__*) — fail fast instead of hanging when the app or the previous connection is gone.
 
 Marionette MCP calls wait as long as the server does. This hook checks in 3 s:
-- connect: the target VM answers getVersion. If the previously connected app is still running per the devctl
+- connect: the target VM answers getVersion. If the previously connected app is still running per the device
   ledger but its VM is silent (paused, e.g. iOS backgrounded), connect would hang closing it -> block
 - disconnect: forget the remembered connection
 - any other tool: the remembered VM answers, and on Android the app is in the foreground
@@ -105,12 +105,12 @@ def main():
     if name == 'connect':
         uri = (data.get('tool_input') or {}).get('uri', '')
         if not vm_alive(uri):
-            block(f'The VM at {uri} did not answer within {TIMEOUT} s. The app is gone or frozen — check `devctl status`.')
+            block(f'The VM at {uri} did not answer within {TIMEOUT} s. The app is gone or frozen — check the device ledger (`anti-stuck-flutter status`).')
         prev = open(STATE).read().strip() if os.path.exists(STATE) else ''
         if prev and prev != uri and app_in_ledger(prev) and not vm_alive(prev):
-            block(f'The previously connected app ({prev}) is still running but its VM is silent (paused). connect closes '
-                  'that connection first and would hang. Bring that app to the foreground, or stop it with '
-                  '`devctl stop <device>`, then disconnect and connect again.')
+            block(f'The previously connected app ({prev}) is still running but its VM does not answer. `connect` has hung for '
+                  'minutes in this state. Bring that app to the foreground, or stop it with '
+                  '`anti-stuck-flutter stop <device>`, then disconnect and connect again.')
         os.makedirs(os.path.dirname(STATE), exist_ok=True)
         open(STATE, 'w').write(uri)
         return
@@ -118,7 +118,7 @@ def main():
     if not uri:
         return
     if not vm_alive(uri):
-        block(f'The connected app ({uri}) VM did not answer within {TIMEOUT} s. Check `devctl status` before connecting again.')
+        block(f'The connected app ({uri}) VM did not answer within {TIMEOUT} s. Check `anti-stuck-flutter status` before connecting again.')
     key, app = android_app_of(uri)
     package = android_package(app) if key else None
     if key and package and name not in ('hot_reload', 'hot_restart') and not android_foreground(key, package):

@@ -12,14 +12,14 @@ stop once while one is unreported.
 The command is:
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/stuck-bg"
+"${CLAUDE_PLUGIN_ROOT}/scripts/anti-stuck" bg
 ```
 
 | Task | Command |
 |---|---|
-| See what is tracked | `"${CLAUDE_PLUGIN_ROOT}/scripts/stuck-bg" list` |
-| Clear an entry after you reported it | `"${CLAUDE_PLUGIN_ROOT}/scripts/stuck-bg" done <id>` |
-| Clear everything after reporting all of it | `"${CLAUDE_PLUGIN_ROOT}/scripts/stuck-bg" done all` |
+| See what is tracked | `"${CLAUDE_PLUGIN_ROOT}/scripts/anti-stuck" bg list` |
+| Clear an entry after you reported it | `"${CLAUDE_PLUGIN_ROOT}/scripts/anti-stuck" bg done <id>` |
+| Clear everything after reporting all of it | `"${CLAUDE_PLUGIN_ROOT}/scripts/anti-stuck" bg done all` |
 
 Rules:
 

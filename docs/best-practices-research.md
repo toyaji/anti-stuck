@@ -55,3 +55,7 @@ rejection): hooks run Python through a launcher, which the validator cannot foll
 - `run.sh` finds a Python 3.8+ interpreter and sets `PYTHONUTF8=1`; a missing script or interpreter passes instead of blocking
 - `while read` / `while IFS= read` loops count as bounded
 - `# eta:` is read from the command's header line only (text inside a command body no longer counts)
+
+## 7. Applied in 0.6.0
+
+- One command per plugin, named exactly after the plugin: `anti-stuck` (core, `anti-stuck bg …`) and `anti-stuck-flutter` (Flutter pack). `stuck-bg` and `devctl` remain as forwarding aliases for one release. Skill `devctl` is renamed `device-ledger`

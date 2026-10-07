@@ -83,17 +83,19 @@ p = subprocess.run(['sh', os.path.join(FLUTTER, 'scripts', 'install_pack.sh')], 
 installed = sorted(os.listdir(os.path.join(HOME, 'packs', 'flutter')))
 check('pack: install_pack.sh publishes 3 rule files', installed == ['command-timeouts.json', 'reap-patterns.json', 'route-rules.json'], installed)
 got, text = enforce('# eta:5 x\nflutter run -d x')
-check('pack route: deny message names the installed devctl path', os.path.join(FLUTTER, 'scripts', 'devctl') in text, text)
-_, wrapped = enforce(f'{os.path.join(FLUTTER, "scripts", "devctl")} status; echo PATH=$PATH')
+check('pack route: deny message names the installed tool path', os.path.join(FLUTTER, 'scripts', 'anti-stuck-flutter') in text, text)
+_, wrapped = enforce(f'{os.path.join(FLUTTER, "scripts", "anti-stuck-flutter")} status; echo PATH=$PATH')
 p = subprocess.run(wrapped, shell=True, capture_output=True, text=True, timeout=20, env=ENV)
-check('tools: devctl runs by full path; tlimit leaves PATH untouched', p.returncode == 0 and 'no devices' in p.stdout and p.stdout.split('PATH=')[-1].strip() == CLEAN_PATH, p.stdout + p.stderr)
+check('tools: anti-stuck-flutter runs by full path; tlimit leaves PATH untouched', p.returncode == 0 and 'no devices' in p.stdout and p.stdout.split('PATH=')[-1].strip() == CLEAN_PATH, p.stdout + p.stderr)
 rc, _, err = hook(CORE, 'no_such_script.py', {})
 got, text = enforce('# eta:5 x\nflutter run -d x')
-check('pack route: flutter run -> devctl', got == 'deny' and 'devctl' in text, text)
+check('pack route: flutter run -> anti-stuck-flutter', got == 'deny' and 'anti-stuck-flutter' in text, text)
 got, _ = enforce('adb -s x install a.apk')
 check('pack route: adb install -> devctl', got == 'deny')
 got, text = enforce('# eta:200 build\ndevctl build -- flutter build apk')
 check('pack route: devctl form allowed, pack time limit applies', got == 'allow' and ' 400 ' in text, text)
+got, text = enforce('# eta:200 build\nanti-stuck-flutter build -- flutter build apk')
+check('pack route: anti-stuck-flutter form allowed with the pack limit', got == 'allow' and ' 400 ' in text, text)
 check('pack time limit: flutter build needs eta', 'eta' in enforce('devctl build -- flutter build apk')[1])
 
 # ── report_long_calls
@@ -117,7 +119,7 @@ def bg(payload):
 r = bg({'hook_event_name': 'PostToolUse', 'tool_name': 'Bash', 'session_id': 'S1', 'tool_use_id': 'toolu_000000BGTEST1',
         'tool_input': {'command': '# eta:1 x\nsleep 1', 'run_in_background': True}, 'tool_response': 'started'})
 check('ledger: background bash registered', r and 'BGTEST1' in r['hookSpecificOutput']['additionalContext'], r)
-check('ledger: message names the full stuck-bg path', r and os.path.join(CORE, 'scripts', 'stuck-bg') in r['hookSpecificOutput']['additionalContext'], r)
+check('ledger: message names the full anti-stuck path', r and os.path.join(CORE, 'scripts', 'anti-stuck') + ' bg done' in r['hookSpecificOutput']['additionalContext'], r)
 check('ledger: foreground bash ignored', bg({'hook_event_name': 'PostToolUse', 'tool_name': 'Bash', 'session_id': 'S1', 'tool_input': {'command': 'ls'}, 'tool_response': 'x'}) is None)
 time.sleep(1.5)
 r = bg({'hook_event_name': 'PreToolUse', 'tool_name': 'Read', 'session_id': 'S1', 'tool_input': {}})
@@ -127,8 +129,8 @@ check('ledger: other session not told', bg({'hook_event_name': 'PreToolUse', 'to
 r = bg({'hook_event_name': 'Stop', 'session_id': 'S1'})
 check('ledger: stop blocked once', r and r.get('decision') == 'block', r)
 check('ledger: second stop passes', bg({'hook_event_name': 'Stop', 'session_id': 'S1'}) is None)
-p = subprocess.run([os.path.join(CORE, 'scripts', 'stuck-bg'), 'done', 'all'], capture_output=True, text=True, timeout=10, env=ENV)
-check('ledger: stuck-bg done all', '0 entries left' in p.stdout, p.stdout + p.stderr)
+p = subprocess.run([os.path.join(CORE, 'scripts', 'anti-stuck'), 'bg', 'done', 'all'], capture_output=True, text=True, timeout=10, env=ENV)
+check('ledger: anti-stuck bg done all', '0 entries left' in p.stdout, p.stdout + p.stderr)
 
 # ── agents
 def guard(payload, env=None):
@@ -171,7 +173,7 @@ open(os.path.join(app, 'build.gradle.kts'), 'w').write('android {\n defaultConfi
 check('marionette: applicationId from build.gradle.kts', gm.android_package({'cwd': os.path.join(HOME, 'app')}) == 'com.example.app')
 
 # ── devctl ledger round trip (no device needed)
-dev = os.path.join(FLUTTER, 'scripts', 'devctl')
+dev = os.path.join(FLUTTER, 'scripts', 'anti-stuck-flutter')
 out = subprocess.run([dev, 'status'], capture_output=True, text=True, timeout=15, env=ENV).stdout
 check('devctl: empty status', 'no devices' in out, out)
 p = subprocess.run([dev, 'build', '--', 'true'], capture_output=True, text=True, timeout=15, env=ENV)
@@ -212,7 +214,7 @@ check('watch: still waiting while A owns it', wB.poll() is None and wC.poll() is
 as_session(A, 'release', 'phone1')
 rB, eB = finish(wB, 10); rC, eC = finish(wC, 10)
 check('watch: both waiters woken with exit 2 on release', rB == 2 and rC == 2, (rB, rC))
-check('watch: wake message says free and names devctl path', all('phone1 is free' in e and dev in e for e in (eB, eC)), eB[:200])
+check('watch: wake message says free and names the tool path', all('phone1 is free' in e and dev in e for e in (eB, eC)), eB[:200])
 p = as_session(C, 'exec', 'phone1', '--', 'true')
 check('devctl: first to take it (C) gets it', p.returncode == 0 and ledger_dev('phone1')['owner']['pid'] == int(C), p.stdout + p.stderr)
 p = as_session(B, 'exec', 'phone1', '--', 'true')
@@ -229,6 +231,20 @@ rc, _, _ = hook(FLUTTER, 'wait_watch.py', {'tool_name': 'Bash', 'tool_input': {'
 check('watch: nothing to wait for -> exit 0', rc == 0)
 for f in fake:
     f.kill()
+
+# ── old names keep working for one release
+p = subprocess.run([os.path.join(CORE, 'scripts', 'stuck-bg'), 'list'], capture_output=True, text=True, timeout=10, env=ENV)
+check('compat: stuck-bg forwards to anti-stuck bg', p.returncode == 0 and 'ledger is empty' in p.stdout, p.stdout + p.stderr)
+p = subprocess.run([os.path.join(FLUTTER, 'scripts', 'devctl'), 'status'], capture_output=True, text=True, timeout=10, env=ENV)
+check('compat: devctl forwards to anti-stuck-flutter', p.returncode == 0 and ('no devices' in p.stdout or 'phone1' in p.stdout), p.stdout + p.stderr)
+rc, _, _ = hook(FLUTTER, 'wait_watch.py', {'tool_name': 'Bash', 'tool_input': {'command': 'devctl wait phone9'}, 'tool_response': 'phone9: nobody is using it.'})
+check('compat: watcher still recognizes `devctl wait`', rc == 0)
+rc, _, _ = hook(FLUTTER, 'wait_watch.py', {'tool_name': 'Bash', 'tool_input': {'command': "python3 - <<'E'\nprint('anti-stuck-flutter wait phone1')\nE\n"}, 'tool_response': 'x'})
+check('watch: a wait inside a heredoc is not a real wait', rc == 0)
+_, wrapped_wait = enforce(f"{dev} wait phone1 'x'")
+check('watch: recognizes a wait inside the tlimit wrapper', bool(importlib.import_module('wait_watch').WAIT.search(importlib.import_module('wait_watch').command_text(wrapped_wait))))
+p = subprocess.run([os.path.join(CORE, 'scripts', 'anti-stuck')], capture_output=True, text=True, timeout=10, env=ENV)
+check('anti-stuck without a subcommand prints usage', p.returncode == 2 and 'bg list' in p.stdout, p.stdout)
 
 shutil.rmtree(HOME, ignore_errors=True)
 print(f'\n{"ALL PASS" if fails == 0 else f"{fails} FAILED"}')

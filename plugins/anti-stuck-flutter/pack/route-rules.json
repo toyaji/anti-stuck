@@ -1,10 +1,10 @@
 {
-  "_doc": "Commands that must go through devctl so sessions never fight over a device or kill each other's apps.",
+  "_doc": "Commands that must go through anti-stuck-flutter so sessions never fight over a device or kill each other's apps.",
   "rules": [
     {
       "pattern": "\\bflutter\\s+(run|attach|install|drive|build)\\b|\\bflutter\\s+test\\b[^\\n;&|]*integration_test|\\bflutter\\s+emulators\\s+--launch\\b|\\bpatrol\\s+(test|develop|build)\\b|\\bfastlane\\b|\\bgradlew\\b[^\\n;&|]*\\b(assemble|install|bundle)|\\badb\\b[^\\n;&|]*\\b(install|uninstall|reboot|emu|kill-server|shell\\s+(am|pm|input|monkey))\\b|(^|[\\s;&|(])emulator\\s+-avd\\b|\\bxcrun\\s+simctl\\s+(boot|shutdown|install|uninstall|launch|terminate|erase)\\b|\\b(pkill|killall)\\b[^\\n;&|]*(flutter|dart|emulator|qemu|adb|Simulator|gradle)",
-      "unless": "^\\s*(#[^\\n]*\\n\\s*)*(\\S*/)?devctl\\b",
-      "message": "Devices, emulators and heavy builds are shared between sessions through the devctl ledger. The devctl command is `{{DEVCTL}}` (see the devctl skill). Run `{{DEVCTL}} status` first, then `{{DEVCTL}} run <device> [flutter run args]`, `{{DEVCTL}} exec <device> -- <cmd>`, `{{DEVCTL}} build -- <cmd>` or `{{DEVCTL}} emu <avd>`. If another session owns the device, `{{DEVCTL}} wait <device> \"purpose\"`; when done, `{{DEVCTL}} release <device>`. Never kill other sessions' apps or emulators (pkill etc.)."
+      "unless": "^\\s*(#[^\\n]*\\n\\s*)*(\\S*/)?(anti-stuck-flutter|devctl)\\b",
+      "message": "Devices, emulators and heavy builds are shared between sessions through the anti-stuck-flutter device ledger. The command is `{{TOOL}}` (see the device-ledger skill). Run `{{TOOL}} status` first, then `{{TOOL}} run <device> [flutter run args]`, `{{TOOL}} exec <device> -- <cmd>`, `{{TOOL}} build -- <cmd>` or `{{TOOL}} emu <avd>`. If another session owns the device, `{{TOOL}} wait <device> \"purpose\"`; when done, `{{TOOL}} release <device>`. Never kill other sessions' apps or emulators (pkill etc.)."
     }
   ]
 }

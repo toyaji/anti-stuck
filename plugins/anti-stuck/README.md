@@ -36,8 +36,8 @@ their own rules on top. Full documentation, packs and how to contribute: <https:
 
 ## Commands
 
-The **background-ledger** skill gives Claude the full path of `scripts/stuck-bg`: `list` shows tracked background work,
-`done <id>` clears an entry after it is reported.
+The **background-ledger** skill gives Claude the full path of `scripts/anti-stuck`: `anti-stuck bg list` shows tracked background work,
+`anti-stuck bg done <id>` clears an entry after it is reported.
 
 ## Recommended settings it cannot set for you
 

@@ -6,7 +6,7 @@
 - PreToolUse(all tools): finished or overdue entries not yet reported -> inject "check and report now"
   (at most once per entry per 60 s)
 - Stop: finished or overdue unreported entries block the stop once so the model reports them
-- After reporting, the model clears entries with `stuck-bg done <id>` (or `done all`). Entries older than 24 h expire
+- After reporting, the model clears entries with `anti-stuck bg done <id>` (or `done all`). Entries older than 24 h expire
 """
 import fcntl
 import json
@@ -16,7 +16,7 @@ import sys
 import time
 
 ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT') or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-STUCK_BG = os.path.join(ROOT, 'scripts', 'stuck-bg')
+TOOL = os.path.join(ROOT, 'scripts', 'anti-stuck')
 HOME = os.environ.get('ANTI_STUCK_HOME') or os.path.expanduser('~/.anti-stuck')
 LEDGER = os.path.join(HOME, 'state', 'bg-ledger.json')
 DEFAULT_ETA = {'Bash': 300, 'Agent': 600}
@@ -83,7 +83,7 @@ def post_tool_use(d):
     emit({'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext':
           f'[anti-stuck: background ledger] registered as {entry_id}, expected to finish by '
           f'{time.strftime("%H:%M", time.localtime(now + eta))} (eta {eta} s). Tell the user that time. When it ends, '
-          f'report the result and run `{STUCK_BG} done {entry_id}`.'}})
+          f'report the result and run `{TOOL} bg done {entry_id}`.'}})
 
 
 def subagent_stop(d):
@@ -118,7 +118,7 @@ def pre_tool_use(d):
         emit({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'additionalContext':
               '[anti-stuck: background ledger] unreported work: ' + ' / '.join(describe(i) for i in due) +
               '. Check its state now and tell the user (finished / failed / still running); clear finished ones with '
-              f'`{STUCK_BG} done <id>`.'}})
+              f'`{TOOL} bg done <id>`.'}})
 
 
 def stop(d):
@@ -130,7 +130,7 @@ def stop(d):
         emit({'decision': 'block', 'reason':
               '[anti-stuck: background ledger] background work was never reported: ' +
               ' / '.join(describe(i) for i in due) +
-              '. Check it, tell the user in one line, clear finished entries with `{STUCK_BG} done <id>`, then stop.'})
+              '. Check it, tell the user in one line, clear finished entries with `{TOOL} bg done <id>`, then stop.'})
 
 
 def cli(args):
@@ -148,7 +148,7 @@ def cli(args):
         if not items:
             print('ledger is empty')
     else:
-        sys.exit('usage: stuck-bg list | done <id>... | done all')
+        sys.exit('usage: anti-stuck bg list | done <id>... | done all')
 
 
 def main():

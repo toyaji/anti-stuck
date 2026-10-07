@@ -1,0 +1,9 @@
+#!/bin/sh
+# anti-stuck <command> — the core plugin's one command-line tool (named after the plugin, see CONTRIBUTING.md)
+#   anti-stuck bg list                 background work being tracked
+#   anti-stuck bg done <id>... | all   clear entries after they are reported
+here="$(cd "$(dirname "$0")" && pwd)"
+case "$1" in
+  bg) shift; exec python3 "$here/bg_ledger.py" "$@" ;;
+  *) sed -n '2,4p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

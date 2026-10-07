@@ -5,7 +5,7 @@
   plugin default, every pack's ~/.anti-stuck/packs/<pack>/command-timeouts.json,
   ~/.anti-stuck/command-timeouts.json, the project's .claude/command-timeouts.json
 - Route rules from packs (~/.anti-stuck/packs/<pack>/route-rules.json): a command matching `pattern` is denied
-  with `message` unless the whole command matches `unless` (e.g. "flutter run" must go through devctl)
+  with `message` unless the whole command matches `unless` (e.g. "flutter run" must go through anti-stuck-flutter)
 - First line '# tlimit:N': N up to the limit is used as is. N=1500 is allowed once, only for a command that
   was already killed at its limit
 - First line '# eta:N what': declared estimate. Required when the limit is above 300 s; limit = min(limit, eta x 2).

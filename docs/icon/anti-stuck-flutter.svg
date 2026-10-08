@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E3F6FF"/><stop offset="1" stop-color="#5FC9F8"/></linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.9"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#sky)"/>
+  <path d="M560 -20 L680 -20 L760 760 L470 760 Z" fill="url(#beam)" opacity="0.7"/>
+  <rect x="0" y="740" width="1024" height="284" fill="#0175C2"/>
+  <ellipse cx="470" cy="790" rx="320" ry="86" fill="#012A4A"/>
+  <!-- rope -->
+  <path d="M640 -20 C628 170 660 300 645 540" fill="none" stroke="#7A4E1E" stroke-width="60" stroke-linecap="round"/>
+  <path d="M640 -20 C628 170 660 300 645 540" fill="none" stroke="#F0C27A" stroke-width="40" stroke-linecap="round" stroke-dasharray="26 22"/>
+  <!-- bird sunk in the pit -->
+  <g transform="translate(0,-40)">
+    <path d="M438 600 C405 530 448 500 470 540 C478 495 535 495 505 590 Z" fill="#13B9FD" stroke="#02569B" stroke-width="16" stroke-linejoin="round"/>
+    <ellipse cx="460" cy="800" rx="190" ry="210" fill="#13B9FD" stroke="#02569B" stroke-width="22"/>
+    <ellipse cx="460" cy="900" rx="110" ry="120" fill="#FFFFFF"/>
+    <ellipse cx="365" cy="755" rx="26" ry="16" fill="#FF8FB1" opacity="0.7"/>
+    <ellipse cx="555" cy="755" rx="26" ry="16" fill="#FF8FB1" opacity="0.7"/>
+    <!-- eyes -->
+    <circle cx="400" cy="700" r="40" fill="#FFFFFF" stroke="#02569B" stroke-width="10"/>
+    <circle cx="510" cy="700" r="40" fill="#FFFFFF" stroke="#02569B" stroke-width="10"/>
+    <circle cx="412" cy="706" r="20" fill="#012A4A"/>
+    <circle cx="522" cy="706" r="20" fill="#012A4A"/>
+    <circle cx="418" cy="698" r="7" fill="#FFFFFF"/>
+    <circle cx="528" cy="698" r="7" fill="#FFFFFF"/>
+    <!-- beak -->
+    <path d="M430 752 L490 752 L460 800 Z" fill="#FFB020" stroke="#C77700" stroke-width="8" stroke-linejoin="round"/>
+    <!-- wing reaching up to the rope -->
+    <path d="M600 760 C680 700 690 600 650 520 C610 560 590 650 580 720 Z" fill="#0175C2" stroke="#02569B" stroke-width="18" stroke-linejoin="round"/>
+    <path d="M622 528 C640 500 675 498 680 532" fill="none" stroke="#02569B" stroke-width="16" stroke-linecap="round"/>
+  </g>
+  <!-- front half of the hole and ground -->
+  <path d="M150 790 A320 86 0 0 0 790 790 L1024 790 L1024 1024 L0 1024 L0 790 Z" fill="#0175C2"/>
+  <path d="M150 790 A320 86 0 0 0 790 790" fill="none" stroke="#02569B" stroke-width="22"/>
+  <rect x="0" y="740" width="150" height="26" fill="#02569B"/>
+  <rect x="790" y="740" width="234" height="26" fill="#02569B"/>
+</svg>

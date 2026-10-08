@@ -6,6 +6,7 @@
   "author": { "name": "toyaji" },
   "homepage": "https://github.com/toyaji/anti-stuck",
   "repository": "https://github.com/toyaji/anti-stuck",
+  "privacyPolicyUrl": "https://github.com/toyaji/anti-stuck/tree/main/plugins/anti-stuck#what-it-runs-reads-and-changes-on-your-machine",
   "license": "MIT",
   "keywords": ["timeout", "hooks", "stuck", "hang", "background", "subagent", "reliability"],
   "userConfig": {

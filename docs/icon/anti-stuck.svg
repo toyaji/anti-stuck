@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF1C9"/><stop offset="1" stop-color="#F6B54B"/></linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.85"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+    <clipPath id="tile"><rect width="1024" height="1024"/></clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="1024" height="1024" fill="url(#sky)"/>
+    <path d="M560 -20 L680 -20 L760 760 L470 760 Z" fill="url(#beam)" opacity="0.7"/>
+    <rect x="0" y="740" width="1024" height="284" fill="#8A5A2B"/>
+    <ellipse cx="470" cy="790" rx="320" ry="86" fill="#2A1A0E"/>
+    <!-- rope comes down, robot hand grips it -->
+    <path d="M640 -20 C628 170 660 300 640 580" fill="none" stroke="#7A4E1E" stroke-width="60" stroke-linecap="round"/>
+    <path d="M640 -20 C628 170 660 300 640 580" fill="none" stroke="#F0C27A" stroke-width="40" stroke-linecap="round" stroke-dasharray="26 22"/>
+    <!-- robot --><g transform="translate(0,110)">
+    <rect x="290" y="500" width="340" height="360" rx="96" fill="#EEF2F8" stroke="#1F2A44" stroke-width="22"/>
+    <rect x="340" y="560" width="240" height="150" rx="62" fill="#1F2A44"/>
+    <circle cx="410" cy="632" r="27" fill="#7FE3FF"/>
+    <circle cx="510" cy="632" r="27" fill="#7FE3FF"/>
+    <circle cx="418" cy="624" r="9" fill="#FFFFFF"/>
+    <circle cx="518" cy="624" r="9" fill="#FFFFFF"/>
+    <line x1="460" y1="500" x2="460" y2="448" stroke="#1F2A44" stroke-width="20" stroke-linecap="round"/>
+    <circle cx="460" cy="436" r="24" fill="#FF6B6B" stroke="#1F2A44" stroke-width="12"/>
+    <path d="M600 620 C660 600 650 520 640 440" fill="none" stroke="#1F2A44" stroke-width="56" stroke-linecap="round"/>
+    <path d="M600 620 C660 600 650 520 640 440" fill="none" stroke="#EEF2F8" stroke-width="22" stroke-linecap="round"/>
+    <rect x="606" y="396" width="70" height="66" rx="30" fill="#EEF2F8" stroke="#1F2A44" stroke-width="18"/>
+    </g><!-- front half of the hole and ground hide the robot's lower body -->
+    <path d="M150 790 A320 86 0 0 0 790 790 L1024 790 L1024 1024 L0 1024 L0 790 Z" fill="#8A5A2B"/>
+    <path d="M150 790 A320 86 0 0 0 790 790" fill="none" stroke="#5E3B1A" stroke-width="22"/>
+    <rect x="0" y="740" width="150" height="26" fill="#6B4320"/>
+    <rect x="790" y="740" width="234" height="26" fill="#6B4320"/>
+  </g>
+</svg>

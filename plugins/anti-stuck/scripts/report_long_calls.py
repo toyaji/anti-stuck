@@ -46,7 +46,7 @@ def main():
         cmd = unwrap_tlimit(inp.get('command', ''))
         m = re.match(r'\s*(?:#\s*tlimit:\d+[^\n]*\n\s*)?#\s*eta:(\d+)', cmd)  # header line only
         eta = int(m.group(1)) if m else None
-        if '[tlimit]' in text or re.search(r'exit code 124|exited with code 124', text):
+        if '[tlimit] killed at' in text or re.search(r'exit code 124|exited with code 124', text):
             reasons.append('it was killed at its time limit — say why')
         if LOOP.search(re.sub(r"'[^']*'|\"[^\"]*\"", "''", cmd)):
             reasons.append('a wait loop finished — say whether its exit condition was met or it hit its bound')

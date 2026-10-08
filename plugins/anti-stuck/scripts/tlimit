@@ -1,9 +1,11 @@
 #!/usr/bin/perl
-# tlimit <seconds> <command> [key] — run a command in its own process group and kill the whole group at the deadline.
-# Every run's elapsed time is appended to $ANTI_STUCK_HOME/logs/tlimit.log (evidence for the timeout registry).
+# tlimit <seconds> <command> [key [full-limit]] — run a command in its own process group and kill the whole group at the deadline.
+# Every run's elapsed time is appended to $ANTI_STUCK_HOME/logs/tlimit.log as DONE (exit 0), FAIL, KILLED or
+# KILLED_LEARNED (killed at a learned limit, which does not unlock the 1500 s retry);
+# enforce_tlimit.py learns each repeated command's limit from its DONE times.
 use strict; use warnings; use POSIX qw(setpgid WNOHANG);
 use Digest::SHA qw(sha1_hex); use Time::HiRes qw(time); use File::Path qw(make_path);
-my ($secs, $cmd, $key) = @ARGV;
+my ($secs, $cmd, $key, $full) = @ARGV;
 die "usage: tlimit <seconds> <command> [key]\n" unless defined $cmd && $secs =~ /^\d+$/;
 $key //= sha1_hex($cmd);
 my $home = $ENV{ANTI_STUCK_HOME} || "$ENV{HOME}/.anti-stuck";
@@ -29,10 +31,15 @@ my $one = substr($cmd =~ s/\s+/ /gr, 0, 200);
 my $ts = POSIX::strftime('%F %T', localtime);
 my $cwd = $ENV{PWD} // '';
 if ($killed) {
-  note("$ts\tKILLED\t$secs\t$el\t$key\t$cwd\t$one\n");
-  print STDERR "\n[tlimit] killed at the ${secs}s limit. If this work is really needed, re-run the same command once with '# tlimit:1500' as its first line.\n";
+  my $learned = $full && $full > $secs;
+  note("$ts\t" . ($learned ? "KILLED_LEARNED" : "KILLED") . "\t$secs\t$el\t$key\t$cwd\t$one\n");
+  if ($learned) {
+    print STDERR "\n[tlimit] killed at the ${secs}s limit learned from this command's past runs. If this work is really needed, re-run the same command as is; it gets its full ${full}s limit this time.\n";
+  } else {
+    print STDERR "\n[tlimit] killed at the ${secs}s limit. If this work is really needed, re-run the same command once with '# tlimit:1500' as its first line.\n";
+  }
   exit 124;
 }
 my $rc = ($st & 127) ? 128 + ($st & 127) : $st >> 8;
-note("$ts\tDONE\t$secs\t$el\t$key\t$cwd\t$one\n");
+note("$ts\t" . ($rc == 0 ? "DONE" : "FAIL") . "\t$secs\t$el\t$key\t$cwd\t$one\n");
 exit $rc;

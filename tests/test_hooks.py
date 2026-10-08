@@ -4,7 +4,7 @@
   python3 tests/test_hooks.py
 Runs against a temporary ANTI_STUCK_HOME, so your real state is never touched.
 """
-import json, os, shutil, subprocess, sys, tempfile, time
+import json, os, shlex, shutil, subprocess, sys, tempfile, time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CORE = os.path.join(REPO, 'plugins', 'anti-stuck')
@@ -78,6 +78,60 @@ p = subprocess.run(wrapped, shell=True, capture_output=True, text=True, timeout=
 check('tlimit: killed at limit with 124', p.returncode == 124 and time.time() - t0 < 7, (p.returncode, time.time() - t0))
 check('tlimit: log under ANTI_STUCK_HOME', 'KILLED\t2\t' in open(os.path.join(HOME, 'logs', 'tlimit.log')).read())
 
+# learned limits from past runs
+LOG = os.path.join(HOME, 'logs', 'tlimit.log')
+def key_of(cmd, cwd='/tmp'):
+    return shlex.split(enforce(cmd, cwd)[1])[3]
+def secs_of(cmd, cwd='/tmp'):
+    got, text = enforce(cmd, cwd)
+    return got, (int(shlex.split(text)[1]) if got == 'allow' else text), shlex.split(text)[4:] if got == 'allow' else []
+ETA = '# eta:9 x\n'  # keeps long registry rules from being denied; the key ignores it
+def fake_run(cmd, status, el, cwd='/tmp'):
+    with open(LOG, 'a') as f:
+        f.write(f"2026-01-01 00:00:00\t{status}\t300\t{el}\t{key_of(ETA + cmd, cwd)}\t{cwd}\t{cmd}\n")
+
+with open(LOG, 'ab') as f:
+    f.write(b'2026-01-01 00:00:00\tDONE\t300\t1.0\tbadkey\t/tmp\techo \xed\x95\n')  # cut mid-character, as tlimit does
+check('learn: undecodable log bytes never block a command', enforce('echo after-bad-bytes')[0] == 'allow')
+check('learn: never-run command gets the registry limit', secs_of('echo learn-a')[1] == 300)
+fake_run('echo learn-a', 'DONE', 2.0)
+check('learn: one success is not enough to learn', secs_of('echo learn-a')[1] == 300)
+fake_run('echo learn-a', 'DONE', 2.0)
+got, secs, extra = secs_of('echo learn-a')
+check('learn: two fast successes -> floor 120 s, full limit passed to tlimit', secs == 120 and extra == ['300'], (secs, extra))
+fake_run('echo learn-a', 'DONE', 100.0)
+check('learn: slowest of recent runs x1.5 + 30', secs_of('echo learn-a')[1] == 180)
+check('learn: other directory does not share history', secs_of('echo learn-a', HOME)[1] == 300)
+fake_run('echo learn-a', 'KILLED_LEARNED', 180.0)
+check('learn: a kill at a learned limit turns learning off -> full limit', secs_of('echo learn-a')[1] == 300)
+check('learn: a kill at a learned limit does not unlock the 1500 s retry', enforce('# tlimit:1500\necho learn-a')[0] == 'deny')
+for _ in range(5):
+    fake_run('echo learn-a', 'DONE', 10.0)
+check('learn: kill older than the last 5 runs is forgotten', secs_of('echo learn-a')[1] == 120)
+fake_run('echo learn-b', 'FAIL', 1.0)
+fake_run('echo learn-b', 'DONE', 1.0)
+check('learn: a failed run among the recent ones teaches nothing', secs_of('echo learn-b')[1] == 300)
+fake_run('echo learn-c', 'DONE', 900.0)
+fake_run('echo learn-c', 'DONE', 900.0)
+check('learn: never above the registry limit', secs_of('echo learn-c')[1] == 300)
+check('learn: explicit # tlimit:N still wins', secs_of('# tlimit:250\necho learn-a')[1] == 250)
+fake_run('slow-thing', 'DONE', 40.0, proj)
+fake_run('slow-thing', 'DONE', 40.0, proj)
+got, secs, _ = secs_of('slow-thing', proj)
+check('learn: learned limit under 300 s needs no eta even for a long registry rule', got == 'allow' and secs == 120, (got, secs))
+json.dump({'rules': [{'pattern': 'slow-thing', 'limit': 900}, {'pattern': 'device-launch', 'limit': 900, 'learn': False}]},
+          open(os.path.join(proj, '.claude', 'command-timeouts.json'), 'w'))
+fake_run('device-launch', 'DONE', 1.0, proj)
+fake_run('device-launch', 'DONE', 1.0, proj)
+got, text = enforce('# eta:400 launch\ndevice-launch', proj)
+check('learn: a "learn": false registry rule is never learned', got == 'allow' and ' 800 ' in text, text)
+p = subprocess.run([os.path.join(CORE, 'scripts', 'tlimit'), '1', 'sleep 5', 'k-learned', '300'], capture_output=True, text=True, timeout=20, env=ENV)
+check('tlimit: kill at a learned limit says re-run as is with the full limit', p.returncode == 124 and 'full 300s' in p.stderr, p.stderr)
+check('tlimit: kill at a learned limit logged as KILLED_LEARNED', '\tKILLED_LEARNED\t1\t' in open(LOG, errors='replace').read())
+_, wrapped = enforce('echo hi; exit 3')
+subprocess.run(wrapped, shell=True, capture_output=True, text=True, timeout=20, env=ENV)
+check('tlimit: non-zero exit logged as FAIL', '\tFAIL\t' in open(LOG, errors='replace').read())
+
 # ── Flutter pack installs its rules, core picks them up
 p = subprocess.run(['sh', os.path.join(FLUTTER, 'scripts', 'install_pack.sh')], env=ENV, timeout=10)
 installed = sorted(os.listdir(os.path.join(HOME, 'packs', 'flutter')))
@@ -96,6 +150,10 @@ got, text = enforce('# eta:200 build\ndevctl build -- flutter build apk')
 check('pack route: devctl form allowed, pack time limit applies', got == 'allow' and ' 400 ' in text, text)
 got, text = enforce('# eta:200 build\nanti-stuck-flutter build -- flutter build apk')
 check('pack route: anti-stuck-flutter form allowed with the pack limit', got == 'allow' and ' 400 ' in text, text)
+fake_run('anti-stuck-flutter run phone1', 'DONE', 0.5)
+fake_run('anti-stuck-flutter run phone1', 'DONE', 0.5)
+got, text = enforce('# eta:400 build and launch\nanti-stuck-flutter run phone1')
+check('pack: anti-stuck-flutter run never learns a short limit from quick reuses', got == 'allow' and ' 800 ' in text, text)
 check('pack time limit: flutter build needs eta', 'eta' in enforce('devctl build -- flutter build apk')[1])
 
 # ── report_long_calls
@@ -104,6 +162,7 @@ def report(payload):
     return json.loads(out)['hookSpecificOutput']['additionalContext'] if out else ''
 
 check('report: short call silent', report({'tool_name': 'Bash', 'tool_input': {'command': 'ls'}, 'tool_response': 'x', 'duration_ms': 500}) == '')
+check('report: "[tlimit]" text in normal output is not a kill', report({'tool_name': 'Bash', 'tool_input': {'command': 'grep tlimit x'}, 'tool_response': 'see [tlimit] here', 'duration_ms': 500}) == '')
 check('report: 65 s call', '65 s' in report({'tool_name': 'Bash', 'tool_input': {'command': 'ls'}, 'tool_response': 'x', 'duration_ms': 65000}))
 loop_wrapped = enforce('SECONDS=0; while [ $SECONDS -lt 9 ]; do sleep 1; done')[1]
 check('report: loop inside tlimit wrapper', 'wait loop' in report({'tool_name': 'Bash', 'tool_input': {'command': loop_wrapped}, 'tool_response': 'x', 'duration_ms': 9000}))

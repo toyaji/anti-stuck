@@ -1,7 +1,7 @@
 {
-  "_doc": "Flutter time limits. Installed into ~/.anti-stuck/packs/flutter/ at session start; the anti-stuck core reads it.",
+  "_doc": "Flutter time limits. \"learn\": false keeps the core from learning a shorter limit for commands whose time depends on device state. Installed into ~/.anti-stuck/packs/flutter/ at session start; the anti-stuck core reads it.",
   "rules": [
-    {"pattern": "(anti-stuck-flutter|devctl) (run|emu|exec|build)", "limit": 1500},
+    {"pattern": "(anti-stuck-flutter|devctl) (run|emu|exec|build)", "limit": 1500, "learn": false},
     {"pattern": "flutter build (apk|appbundle|web)", "limit": 900},
     {"pattern": "flutter build (ios|ipa|macos)", "limit": 1500},
     {"pattern": "pod (install|update)", "limit": 900},

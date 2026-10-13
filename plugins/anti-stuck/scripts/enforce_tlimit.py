@@ -6,6 +6,10 @@
   ~/.anti-stuck/command-timeouts.json, the project's .claude/command-timeouts.json
 - Route rules from packs (~/.anti-stuck/packs/<pack>/route-rules.json): a command matching `pattern` is denied
   with `message` unless the whole command matches `unless` (e.g. "flutter run" must go through anti-stuck-flutter)
+- Learned limit: a command with at least LEARN_MIN successful runs in the same directory gets max(LEARN_FLOOR,
+  slowest of its last LEARN_RUNS runs x 1.5 + 30 s), never more than the registry limit. A kill or failure among
+  those runs turns learning off, so the next run gets the full limit. A registry rule with "learn": false (device
+  and launch commands whose time depends on state, not work) is never learned
 - First line '# tlimit:N': N up to the limit is used as is. N=1500 is allowed once, only for a command that
   was already killed at its limit
 - First line '# eta:N what': declared estimate. Required when the limit is above 300 s; limit = min(limit, eta x 2).
@@ -21,6 +25,7 @@ HOME = os.environ.get('ANTI_STUCK_HOME') or os.path.expanduser('~/.anti-stuck')
 TLIMIT = os.path.join(ROOT, 'scripts', 'tlimit')
 LOG = os.path.join(HOME, 'logs', 'tlimit.log')
 DEFAULT, RETRY = 300, 1500
+LEARN_RUNS, LEARN_MIN, LEARN_FLOOR = 5, 2, 120
 LOG_ROTATE_BYTES = 5 * 1024 * 1024
 
 
@@ -69,10 +74,29 @@ def rotate_log():
 def log_lines():
     for p in (LOG, LOG + '.1'):
         try:
-            with open(p) as f:
+            with open(p, encoding='utf-8', errors='replace') as f:  # tlimit cuts lines at 200 bytes, mid-character
                 yield from f
         except OSError:
             pass
+
+
+def learned_limit(key, cwd, limit):
+    """Tighter limit from this command's own history in this directory, or None when there is nothing to learn from."""
+    runs = []
+    for line in log_lines():
+        if key not in line:
+            continue
+        f = line.rstrip('\n').split('\t')
+        if len(f) >= 6 and f[4] == key and f[5] == cwd:
+            runs.append(f)
+    recent = runs[-LEARN_RUNS:]
+    if len(recent) < LEARN_MIN or any(f[1] != 'DONE' for f in recent):
+        return None
+    try:
+        slowest = max(float(f[3]) for f in recent)
+    except ValueError:
+        return None
+    return min(limit, max(LEARN_FLOOR, int(slowest * 1.5) + 30))
 
 
 HEADER = re.compile(r'\s*#\s*(tlimit|eta):(\d+)([^\n]*)\n')
@@ -158,15 +182,21 @@ def main():
     key = hashlib.sha1(norm.encode()).hexdigest()
     norm_code = re.sub(r'\s+', ' ', code).strip()
 
-    limit = DEFAULT
+    limit, learnable = DEFAULT, True
     for r in registries(data.get('cwd') or os.getcwd()):
         try:
             if re.search(r['pattern'], norm_code):
                 limit = max(limit, int(r['limit']))
+                learnable = learnable and r.get('learn', True) is not False
         except (re.error, KeyError, ValueError, TypeError):
             pass
 
-    secs = limit
+    cwd = data.get('cwd') or os.getcwd()
+    try:
+        learned = learned_limit(key, cwd, limit) if asked is None and learnable else None
+    except Exception:  # learning only tightens a limit; when it fails, the registry limit still applies
+        learned = None
+    secs = learned or limit
     if asked is not None:
         if asked <= limit:
             secs = asked
@@ -195,7 +225,8 @@ def main():
         secs = min(secs, max(eta * 2, 60))
 
     rotate_log()
-    wrapped = f"{shlex.quote(TLIMIT)} {secs} {shlex.quote(body)} {key}"
+    full = f' {limit}' if learned and limit > secs else ''
+    wrapped = f"{shlex.quote(TLIMIT)} {secs} {shlex.quote(body)} {key}{full}"
     new = dict(inp)
     new['command'] = wrapped
     new['timeout'] = min(600000, secs * 1000 + 15000)

@@ -182,7 +182,8 @@ def kill_device(led, key):
         if alive(d['emulator_pid']):
             os.kill(d['emulator_pid'], signal.SIGTERM)
     del led.devices[key]
-    return f"{key}: stopped the app{' and emulator' if d.get('emulator_pid') else ''} and removed it from the ledger."
+    stopped = ' and '.join(x for x, on in (('the app', d.get('app')), ('the emulator', d.get('emulator_pid'))) if on)
+    return f"{key}: {'stopped ' + stopped + ' and ' if stopped else ''}removed it from the ledger."
 
 
 def screen_off(key):

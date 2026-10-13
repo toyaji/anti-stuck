@@ -23,7 +23,7 @@ The command is:
 | Heavy build, one at a time across sessions | `"${CLAUDE_PLUGIN_ROOT}/scripts/anti-stuck-flutter" build -- <command>` |
 | Boot an emulator and take it | `"${CLAUDE_PLUGIN_ROOT}/scripts/anti-stuck-flutter" emu <avd>` |
 | Wait for a busy device (you are woken when it is free) | `"${CLAUDE_PLUGIN_ROOT}/scripts/anti-stuck-flutter" wait <device> "purpose"` |
-| Release a device (the app keeps running, waiters are woken) | `"${CLAUDE_PLUGIN_ROOT}/scripts/anti-stuck-flutter" release <device>` |
+| Release a device: with waiters the app keeps running and they are woken; with none the app is stopped and an Android phone's screen turned off | `"${CLAUDE_PLUGIN_ROOT}/scripts/anti-stuck-flutter" release <device>` |
 | Stop the app (only your own, only if nobody waits) | `"${CLAUDE_PLUGIN_ROOT}/scripts/anti-stuck-flutter" stop <device>` |
 
 Rules:
@@ -37,7 +37,9 @@ Rules:
    of rebuilding.
 4. `run`, `emu`, `exec` and `build` can be slow: start them with `# eta:<seconds> <what>` on the first line and tell the
    user the expected time.
-5. Release a device as soon as you stop using it. A session that goes idle releases its devices automatically, and apps
-   keep running for the next session.
+5. Release a device as soon as your work on it is done. If nobody waits, `release` stops the app and turns an Android
+   phone's screen off. Pausing mid-work for something else? Check `status` and release only if someone is waiting —
+   they get the running app. A session that merely goes idle releases its devices automatically but keeps apps running, so its
+   next turn can reuse them; a device left free with nobody waiting is cleaned up the same way after 15 minutes.
 6. Hot reload and hot restart go through the Marionette MCP `hot_reload` / `hot_restart` tools, connected to the
    address `status` shows. `flutter run` does not read keys from a pipe.

@@ -9,7 +9,7 @@ Documentation and contributing: <https://github.com/toyaji/anti-stuck>.
 
 - **`anti-stuck-flutter`** (taught to Claude by the **device-ledger** skill, which carries its full path) — one ledger that every Claude Code session on the machine shares for real devices, emulators and
   heavy builds: `status`, `run <device> [flutter run args]`, `exec <device> -- <cmd>`, `build -- <cmd>` (one at a
-  time), `wait <device>`, `release <device>` (the app keeps running), `stop <device>`, `emu <avd>`
+  time), `wait <device>`, `release <device>` (with waiters the app keeps running; with none it is stopped and the screen turned off), `stop <device>`, `emu <avd>`
 - **Wake on free** — after `anti-stuck-flutter wait`, a background hook watches the ledger and wakes the waiting session the moment
   the device is free, even if the session is idle. All waiting sessions are woken; the first one to take the device gets
   it, so a session that is idle-waiting is not stuck behind one that is busy with other work. The watch gives up and
@@ -35,8 +35,9 @@ Documentation and contributing: <https://github.com/toyaji/anti-stuck>.
   or 29 minutes pass. It reads nothing else and has no network access
 - **Writes** under `~/.anti-stuck/`: the device ledger and app logs (`state/devices/`), the last Marionette address,
   and this pack's rule files (`packs/flutter/`), refreshed at session start. It never changes `PATH`
-- **Stops** an app or emulator only when you run `anti-stuck-flutter stop`, or when a device has been left free for 60 min.
-  When a session goes idle it releases its devices but leaves apps running
+- **Stops** an app or emulator when you run `anti-stuck-flutter stop`, when you `release` a device nobody is waiting for,
+  or when a device has been left free for 15 min with nobody waiting; then it turns a real Android phone's screen off
+  (`adb shell input keyevent KEYCODE_SLEEP`). When a session goes idle it releases its devices but leaves apps running
 
 ## Options
 

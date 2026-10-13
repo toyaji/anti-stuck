@@ -31,7 +31,7 @@ LEDGER = os.path.join(STATE, 'ledger.json')
 LOCK = os.path.join(STATE, 'ledger.lock')
 URI_RE = re.compile(r'(http://127\.0\.0\.1:\d+/[A-Za-z0-9_=\-]+=/)')
 RUN_WAIT_SEC = 1400
-FREE_APP_TTL_SEC = 3600
+FREE_APP_TTL_SEC = 15 * 60
 TOOL = os.path.abspath(__file__)  # messages give Claude the exact path to call
 
 
@@ -102,7 +102,7 @@ class Ledger:
             if owner and not alive(owner['pid']):
                 free_device(self, key)
             elif not owner and not d['waiters'] and time.time() - d.get('free_at', time.time()) > FREE_APP_TTL_SEC:
-                kill_device(self, key)
+                retire_device(self, key)
 
 
 def now():
@@ -155,7 +155,8 @@ def stop_app(app):
 
 
 def free_device(led, key):
-    """Release ownership only. Apps and emulators keep running and the device becomes free. Waiters are not handed
+    """Release ownership only (waiters are present, or the session merely went idle). Apps and emulators keep running
+    and the device becomes free. Waiters are not handed
     the device: their wait_watch hooks see it free and wake them, and the first one to take it gets it."""
     d = led.devices[key]
     d['owner'] = None
@@ -168,7 +169,7 @@ def free_device(led, key):
     waiting = len(d.get('waiters', []))
     note = f' {waiting} waiting session(s) are being woken; the first to take it gets it.' if waiting else ''
     return (f"{key}: released. The app keeps running and the device is free (cleaned up after "
-            f"{FREE_APP_TTL_SEC // 60} min unused).{note}")
+            f"{FREE_APP_TTL_SEC // 60} min unused, screen turned off).{note}")
 
 
 def kill_device(led, key):
@@ -182,6 +183,23 @@ def kill_device(led, key):
             os.kill(d['emulator_pid'], signal.SIGTERM)
     del led.devices[key]
     return f"{key}: stopped the app{' and emulator' if d.get('emulator_pid') else ''} and removed it from the ledger."
+
+
+def screen_off(key):
+    """Turn off a real Android device's screen (it locks if a lock is set). Other devices are left as they are."""
+    try:
+        out = subprocess.run(['adb', 'devices'], capture_output=True, text=True, timeout=15).stdout
+        if key.startswith('emulator-') or not re.search(rf'^{re.escape(key)}\s+device\b', out, re.M):
+            return ''
+        subprocess.run(['adb', '-s', key, 'shell', 'input', 'keyevent', 'KEYCODE_SLEEP'], capture_output=True, timeout=15)
+        return ' Screen turned off.'
+    except (OSError, subprocess.TimeoutExpired):
+        return ''
+
+
+def retire_device(led, key):
+    """Nobody needs the device any more: stop its app (and emulator), drop it from the ledger, and turn its screen off."""
+    return kill_device(led, key) + screen_off(key)
 
 
 def take(led, key, me, purpose):
@@ -246,7 +264,8 @@ def cmd_release(args, me):
             return
         if d['owner']['pid'] != me['pid']:
             sys.exit(f"{key}: owned by {d['owner']['label']}. You cannot release someone else's device.")
-        print(free_device(led, key))
+        # Waiters get the running app; with nobody waiting, the work is done and the device is put to rest.
+        print(free_device(led, key) if d.get('waiters') else retire_device(led, key))
 
 
 def cmd_stop(args, me):

@@ -288,6 +288,9 @@ rc, _, _ = hook(FLUTTER, 'wait_watch.py', {'tool_name': 'Bash', 'tool_input': {'
 check('watch: other commands exit 0 at once', rc == 0)
 rc, _, _ = hook(FLUTTER, 'wait_watch.py', {'tool_name': 'Bash', 'tool_input': {'command': f'{dev} wait phone9'}, 'tool_response': 'phone9: nobody is using it. Use it directly.'})
 check('watch: nothing to wait for -> exit 0', rc == 0)
+p = as_session(B, 'exec', 'phone2', '--', 'true')
+p = as_session(B, 'release', 'phone2')
+check('devctl: release with nobody waiting retires the device', p.returncode == 0 and ledger_dev('phone2') is None and 'stopped' in p.stdout, p.stdout + p.stderr)
 for f in fake:
     f.kill()
 

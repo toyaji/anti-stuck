@@ -35,7 +35,7 @@ their own rules on top. Full documentation, packs and how to contribute: <https:
 
 ## Options
 
-`agent_limit_minutes` (10), `require_foreground_agents` (true), `allow_background` (false).
+`agent_limit_minutes` (10), `allow_background` (false).
 
 ## Commands
 

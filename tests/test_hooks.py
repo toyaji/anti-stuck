@@ -196,8 +196,7 @@ def guard(payload, env=None):
     _, out, _ = hook(CORE, 'guard_agents.py', {'hook_event_name': 'PreToolUse', **payload}, env)
     return json.loads(out)['hookSpecificOutput'] if out else {}
 
-check('agents: background agent denied', guard({'tool_name': 'Agent', 'tool_input': {}}).get('permissionDecision') == 'deny')
-check('agents: option turns it off', guard({'tool_name': 'Agent', 'tool_input': {}}, {'CLAUDE_PLUGIN_OPTION_REQUIRE_FOREGROUND_AGENTS': 'false'}).get('permissionDecision') != 'deny')
+check('agents: Agent call without run_in_background passes', guard({'tool_name': 'Agent', 'tool_input': {}}).get('permissionDecision') != 'deny')
 check('bash bg: denied without request', guard({'tool_name': 'Bash', 'tool_input': {'command': 'ls', 'run_in_background': True}}).get('permissionDecision') == 'deny')
 check('bash bg: option allows', guard({'tool_name': 'Bash', 'tool_input': {'command': 'ls', 'run_in_background': True}}, {'CLAUDE_PLUGIN_OPTION_ALLOW_BACKGROUND': 'true'}).get('permissionDecision') != 'deny')
 fast = {'CLAUDE_PLUGIN_OPTION_AGENT_LIMIT_MINUTES': '0.0005'}

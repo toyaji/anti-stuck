@@ -3,7 +3,6 @@
 
 - Bash run_in_background is denied unless the user's last message asked for background work
   (plugin option allow_background = true turns this off)
-- Agent must be called with run_in_background: false (plugin option require_foreground_agents = false turns this off)
 - Inside a subagent every tool call shows elapsed time; past agent_limit_minutes every tool call is denied so the
   subagent reports what it has and stops
 - SubagentStop logs the run and clears its clock
@@ -76,9 +75,6 @@ def pre_tool_use(data):
         if not BG_REQUEST.search(last_user_text(data.get('transcript_path'))):
             deny('Background Bash is only allowed when the user explicitly asked for it in their last message. '
                  'Run it in the foreground (tlimit bounds it).')
-
-    if tool == 'Agent' and inp.get('run_in_background') is not False and flag('require_foreground_agents', True):
-        deny('Call Agent with run_in_background: false so you wait for it and report its result right away.')
 
     agent_id = data.get('agent_id')
     if not agent_id:

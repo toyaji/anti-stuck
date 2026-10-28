@@ -33,7 +33,7 @@ Rules:
    working on something else or stop: a hook wakes this session the moment the device is free.
 3. When woken, take the device **only if you will use it right now**. Every waiting session is woken at once and the
    first to take it gets it, so a session that grabs it "for later" blocks one that is waiting with nothing else to do.
-   If you lose the race, `wait` again. Reuse the running app through the Marionette address in the wake message instead
+   Being woken takes you off the waiters list, so if you lose the race, `wait` again. Reuse the running app through the Marionette address in the wake message instead
    of rebuilding.
 4. `run`, `emu`, `exec` and `build` can be slow: start them with `# eta:<seconds> <what>` on the first line and tell the
    user the expected time.

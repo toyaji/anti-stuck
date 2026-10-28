@@ -10,10 +10,11 @@ Documentation and contributing: <https://github.com/toyaji/anti-stuck>.
 - **`anti-stuck-flutter`** (taught to Claude by the **device-ledger** skill, which carries its full path) — one ledger that every Claude Code session on the machine shares for real devices, emulators and
   heavy builds: `status`, `run <device> [flutter run args]`, `exec <device> -- <cmd>`, `build -- <cmd>` (one at a
   time), `wait <device>`, `release <device>` (with waiters the app keeps running; with none it is stopped and the screen turned off), `stop <device>`, `emu <avd>`
-- **Wake on free** — after `anti-stuck-flutter wait`, a background hook watches the ledger and wakes the waiting session the moment
-  the device is free, even if the session is idle. All waiting sessions are woken; the first one to take the device gets
-  it, so a session that is idle-waiting is not stuck behind one that is busy with other work. The watch gives up and
-  wakes the session after 29 minutes so nothing waits forever
+- **Wake on free** — while a session is on a device's waiters list, a background hook watches the ledger and wakes it the
+  moment the device is free, even if the session is idle. The trigger is the ledger, not the command text, so a `wait`
+  run through a variable or script is watched too, and so is every device the session waits for. All waiting sessions
+  are woken and taken off the list; the first one to take the device gets it, the others `wait` again. The watch gives
+  up and wakes the session after 29 minutes so nothing waits forever
 - **Routing** — `flutter run/attach/install/drive/build`, integration tests, `patrol`, `fastlane`, Gradle installs,
   `adb install`/`reboot`/`shell am|pm|input`, `emulator -avd`, `xcrun simctl boot|install|launch…`, and
   `pkill`/`killall` of Flutter or emulator processes are refused unless they go through `anti-stuck-flutter`

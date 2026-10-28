@@ -3,8 +3,8 @@
 
 - Bash run_in_background is denied unless the user's last message asked for background work
   (plugin option allow_background = true turns this off)
-- Inside a subagent every tool call shows elapsed time; past agent_limit_minutes every tool call is denied so the
-  subagent reports what it has and stops
+- Inside a subagent every tool call shows elapsed time; past agent_limit_minutes every tool call except
+  SubagentHandback is denied so the subagent reports what it has and stops
 - SubagentStop logs the run and clears its clock
 """
 import json
@@ -28,6 +28,7 @@ def flag(name, default):
 
 
 AGENT_LIMIT_SEC = int(float(option('agent_limit_minutes', 10)) * 60)
+FINISH_TOOLS = {'SubagentHandback'}  # the call that ends the run must get through the time limit
 BG_REQUEST = re.compile(r'background|백그라운드', re.IGNORECASE)
 
 
@@ -91,7 +92,7 @@ def pre_tool_use(data):
             start = float(f.read().strip() or now)
     elapsed = now - start
     limit_min = AGENT_LIMIT_SEC / 60
-    if elapsed > AGENT_LIMIT_SEC:
+    if elapsed > AGENT_LIMIT_SEC and tool not in FINISH_TOOLS:
         deny(f'Subagent time limit of {limit_min:.0f} min exceeded ({elapsed / 60:.1f} min). Do not use more tools — '
              'report what you confirmed and what you could not, and finish now.')
     emit({'hookSpecificOutput': {'hookEventName': 'PreToolUse',

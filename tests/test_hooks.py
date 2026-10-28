@@ -203,6 +203,7 @@ fast = {'CLAUDE_PLUGIN_OPTION_AGENT_LIMIT_MINUTES': '0.0005'}
 guard({'tool_name': 'Read', 'tool_input': {}, 'agent_id': 'agTEST'}, fast)
 time.sleep(0.2)
 check('agents: over limit denied', guard({'tool_name': 'Read', 'tool_input': {}, 'agent_id': 'agTEST'}, fast).get('permissionDecision') == 'deny')
+check('agents: SubagentHandback passes over limit', guard({'tool_name': 'SubagentHandback', 'tool_input': {}, 'agent_id': 'agTEST'}, fast).get('permissionDecision') != 'deny')
 hook(CORE, 'guard_agents.py', {'hook_event_name': 'SubagentStop', 'agent_id': 'agTEST'})
 
 # ── reaper picks up pack patterns (a real orphan-free old process is hard to fake; check the pattern list)

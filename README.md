@@ -1,11 +1,33 @@
+<p align="center"><img src="docs/icon/anti-stuck.svg" width="96" alt=""></p>
+
 # Anti-Stuck
 
-**A stuck agent is worse than a failed one.** A failed command tells you something went wrong.
-A stuck one burns your afternoon while you wait for a result that already arrived — or never will.
+**Claude Code never waits forever — and always tells you when long work ends.**
 
-Anti-Stuck is a Claude Code plugin that makes sure Claude never waits forever on a command, a tool,
-a device or a subagent, and always tells you when long or background work ends.
-Framework **packs** add rules for their own ecosystems — the first one is for Flutter.
+[![Release](https://img.shields.io/github/v/release/toyaji/anti-stuck)](https://github.com/toyaji/anti-stuck/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-8A63D2)](https://docs.claude.com/en/docs/claude-code/plugins)
+
+A stuck agent is worse than a failed one. A failed command says what went wrong; a stuck one burns your afternoon.
+Real cases from one day: an MCP call that hung for **10+ min**, a finished loop reported **15+ min** late, a subagent stuck for **about an hour**
+([all cases](docs/stuck-cases.md)).
+
+```bash
+claude plugin marketplace add toyaji/anti-stuck
+claude plugin install anti-stuck@anti-stuck            # core: time limits, forced reports, background ledger, subagent budget
+claude plugin install anti-stuck-flutter@anti-stuck    # optional: share phones/emulators between sessions
+```
+
+| Without Anti-Stuck | With Anti-Stuck |
+|---|---|
+| A Bash command hangs until you notice | Killed at the limit (300 s default; `# eta:<s>` for longer) |
+| A loop finishes, Claude moves on silently | Claude must report on the first line of its next reply |
+| Background work is forgotten | A ledger pushes finished/overdue work back on every tool call |
+| A subagent runs for an hour | 10-minute budget; past it, it must report and stop |
+| Two sessions fight over one phone | One owner per device; waiters are woken when it frees up (Flutter pack) |
+
+Hooks and skills only — no daemon, no network. Framework **packs** add rules for their own ecosystems — the first one is
+for Flutter. Each plugin README lists exactly what it runs, reads, writes and kills.
 
 ## Why it exists
 

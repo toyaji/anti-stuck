@@ -5,6 +5,7 @@ Ledger: $ANTI_STUCK_HOME/state/devices/ledger.json (default ~/.anti-stuck; share
 Session identity: the Claude Code process that called this command. When it dies, its ownership is released.
 
   anti-stuck-flutter status                         who uses what, waiters, app build (branch@commit) and Marionette address
+  anti-stuck-flutter attach <device> [attach args]  take the device, launch the already-installed app and attach (no Xcode/Gradle build)
   anti-stuck-flutter run <device> [flutter run args] take the device and start the app (reuses my app if it is already up)
   anti-stuck-flutter reload|restart <device>        how to hot reload / hot restart through Marionette, with the address
   anti-stuck-flutter exec <device> -- <command>     take the device and run a command (integration test, adb install, ...)
@@ -30,7 +31,10 @@ STATE = os.path.join(HOME, 'state', 'devices')
 LEDGER = os.path.join(STATE, 'ledger.json')
 LOCK = os.path.join(STATE, 'ledger.lock')
 URI_RE = re.compile(r'(http://127\.0\.0\.1:\d+/[A-Za-z0-9_=\-]+=/)')
+IOS_SIM_RE = re.compile(r'^[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}$', re.I)
+IOS_DEV_RE = re.compile(r'^[0-9A-F]{8}-[0-9A-F]{16}$', re.I)
 RUN_WAIT_SEC = 1400
+ATTACH_WAIT_SEC = 60
 FREE_APP_TTL_SEC = 15 * 60
 TOOL = os.path.abspath(__file__)  # messages give Claude the exact path to call
 
@@ -265,8 +269,8 @@ def cmd_release(args, me):
             return
         if d['owner']['pid'] != me['pid']:
             sys.exit(f"{key}: owned by {d['owner']['label']}. You cannot release someone else's device.")
-        # Waiters get the running app; with nobody waiting, the work is done and the device is put to rest.
-        print(free_device(led, key) if d.get('waiters') else retire_device(led, key))
+        # Keep the running app alive so the next turn/session can reuse it in 0 s; _sweep retires it after FREE_APP_TTL_SEC.
+        print(free_device(led, key))
 
 
 def cmd_stop(args, me):
@@ -295,7 +299,7 @@ def cmd_send(args, me, key_char):
     with Ledger() as led:
         d = led.devices.get(key)
         if not d or not d.get('app'):
-            sys.exit(f'{key}: no app running. Start it with {TOOL} run {key}.')
+            sys.exit(f'{key}: no app running. Start it with {TOOL} attach {key} (or {TOOL} run {key}).')
         if d.get('owner') and d['owner']['pid'] != me['pid']:
             sys.exit(describe(key, d, me) + f'\n-> someone else\'s app. `{TOOL} wait {key}`.')
         ws = d['app'].get('ws')
@@ -303,29 +307,92 @@ def cmd_send(args, me, key_char):
     sys.exit(f"{key}: flutter run does not take keys from a pipe. Connect with Marionette (connect {ws}) and use its {tool} tool.")
 
 
-def cmd_run(args, me):
-    key, extra = args[0], args[1:]
+def ios_bundle_id(cwd):
+    override = os.environ.get('CLAUDE_PLUGIN_OPTION_IOS_BUNDLE_ID')
+    if override:
+        return override
+    try:
+        src = open(os.path.join(cwd, 'ios', 'Runner.xcodeproj', 'project.pbxproj')).read()
+        ids = [m.strip('"\'') for m in re.findall(r'PRODUCT_BUNDLE_IDENTIFIER\s*=\s*([^;\s]+)\s*;', src) if '$' not in m]
+        if ids:
+            return min(ids, key=len)
+    except OSError:
+        pass
+    return None
+
+
+def android_package(cwd):
+    override = os.environ.get('CLAUDE_PLUGIN_OPTION_ANDROID_PACKAGE')
+    if override:
+        return override
+    for name in ('build.gradle.kts', 'build.gradle'):
+        try:
+            src = open(os.path.join(cwd, 'android', 'app', name)).read()
+        except OSError:
+            continue
+        m = re.search(r'applicationId\s*=?\s*["\']([\w.]+)["\']', src)
+        if m:
+            return m.group(1)
+    return None
+
+
+def prepare_attach_cmd(key, cwd, extra):
+    if IOS_SIM_RE.match(key):
+        bid = ios_bundle_id(cwd)
+        if bid:
+            p = subprocess.run(['xcrun', 'simctl', 'launch', '--terminate-running-process', key, bid],
+                               capture_output=True, text=True, timeout=20)
+            if p.returncode == 0:
+                return ['flutter', 'attach', '-d', key, *extra], None
+        app_bin = os.path.join(cwd, 'build', 'ios', 'iphonesimulator', 'Runner.app')
+        if os.path.isdir(app_bin):
+            return ['flutter', 'run', '-d', key, '--use-application-binary=build/ios/iphonesimulator/Runner.app', *extra], None
+        return None, f'{key}: app ({bid or "Runner"}) is not installed on this simulator. Run `{TOOL} run {key}` once to build and install it.'
+    if IOS_DEV_RE.match(key):
+        p = subprocess.run(['xcrun', 'devicectl', 'device', 'info', 'processes', '--device', key, '-t', '10'],
+                           capture_output=True, text=True, timeout=15)
+        if p.returncode == 0 and 'Runner.app' in p.stdout:
+            return ['flutter', 'attach', '-d', key, *extra], None
+        app_bin = os.path.join(cwd, 'build', 'ios', 'iphoneos', 'Runner.app')
+        if os.path.isdir(app_bin):
+            return ['flutter', 'run', '-d', key, '--use-application-binary=build/ios/iphoneos/Runner.app', *extra], None
+        return None, (f'{key}: app is not running on this iOS device and build/ios/iphoneos/Runner.app was not found. '
+                      f'Run `{TOOL} run {key}` once to build and install it.')
+    pkg = android_package(cwd)
+    if pkg:
+        p = subprocess.run(['adb', '-s', key, 'shell', 'monkey', '-p', pkg, '-c', 'android.intent.category.LAUNCHER', '1'],
+                           capture_output=True, text=True, timeout=15)
+        if p.returncode != 0 or 'No activities found' in (p.stdout + p.stderr):
+            return None, f'{key}: app ({pkg}) is not installed on this Android device. Run `{TOOL} run {key}` once to build and install it.'
+    return ['flutter', 'attach', '-d', key, *extra], None
+
+
+def _start_or_attach(key, extra, me, purpose, cmd_list, wait_sec):
     cwd = os.getcwd()
     with Ledger() as led:
-        d, why = take(led, key, me, 'flutter run')
+        d, why = take(led, key, me, purpose)
         if why:
             sys.exit(why)
         app = d.get('app')
         if app and alive(app['pid']):
             print(describe(key, d, me) + f'\n-> My app is already running. Do not rebuild — hot reload / restart through Marionette.')
             return
+        if cmd_list is None:
+            cmd_list, err = prepare_attach_cmd(key, cwd, extra)
+            if err:
+                sys.exit(err)
         os.makedirs(STATE, exist_ok=True)
         tag = re.sub(r'[^A-Za-z0-9_.-]', '_', key)
         fifo, log = os.path.join(STATE, f'{tag}.stdin'), os.path.join(STATE, f'{tag}.log')
         if os.path.exists(fifo):
             os.remove(fifo)
         os.mkfifo(fifo)
-        flutter = ' '.join(['flutter', 'run', '-d', key, *[repr(a) if ' ' in a else a for a in extra]])
+        flutter = ' '.join([repr(a) if ' ' in a else a for a in cmd_list])
         proc = subprocess.Popen(['bash', '-c', f'exec 3<>"{fifo}"; exec {flutter} <&3 >"{log}" 2>&1'],
                                 cwd=cwd, start_new_session=True)
         d['app'] = {'pid': proc.pid, 'fifo': fifo, 'log': log, 'uri': None, 'ws': None, 'started': now(),
                     'cwd': cwd, **git_info(cwd)}
-    deadline = time.time() + RUN_WAIT_SEC
+    deadline = time.time() + wait_sec
     uri = None
     while time.time() < deadline:
         if proc.poll() is not None:
@@ -349,8 +416,19 @@ def cmd_run(args, me):
         if d:
             stop_app(d.get('app'))
             d['app'] = None
-        sys.exit(f'{key}: the app did not start (build failed or over {RUN_WAIT_SEC} s). You still own the device — '
+        sys.exit(f'{key}: the app did not start (failed or over {wait_sec} s). You still own the device — '
                  f'`{TOOL} release {key}` if you are done.\n{tail}')
+
+
+def cmd_run(args, me):
+    key, extra = args[0], args[1:]
+    _start_or_attach(key, extra, me, 'flutter run', ['flutter', 'run', '-d', key, *extra], RUN_WAIT_SEC)
+
+
+def cmd_attach(args, me):
+    key, extra = args[0], args[1:]
+    wait_sec = ATTACH_WAIT_SEC if not IOS_DEV_RE.match(key) else 180
+    _start_or_attach(key, extra, me, 'flutter attach', None, wait_sec)
 
 
 def cmd_exec(args, me, auto_release=False):
@@ -418,6 +496,8 @@ def main():
         cmd_send(args, me, 'r')
     elif cmd == 'restart' and args:
         cmd_send(args, me, 'R')
+    elif cmd == 'attach' and args:
+        cmd_attach(args, me)
     elif cmd == 'run' and args:
         cmd_run(args, me)
     elif cmd == 'exec' and args:

@@ -1,8 +1,8 @@
 {
   "name": "anti-stuck-flutter",
   "displayName": "Anti-Stuck for Flutter",
-  "version": "0.7.1",
-  "description": "Flutter pack for anti-stuck: the anti-stuck-flutter command, a cross-session ledger for real devices, emulators and heavy builds; fail-fast Marionette MCP guards; Flutter build/test time limits; flutter_tester runaway cleanup.",
+  "version": "0.7.2",
+  "description": "Flutter pack for anti-stuck: the anti-stuck-flutter command (with fast attach and running-app reuse), a cross-session ledger for real devices, emulators and heavy builds; fail-fast Marionette MCP guards; Flutter build/test time limits; flutter_tester runaway cleanup.",
   "author": { "name": "toyaji" },
   "homepage": "https://github.com/toyaji/anti-stuck",
   "repository": "https://github.com/toyaji/anti-stuck",
@@ -15,6 +15,12 @@
       "type": "string",
       "title": "Android applicationId override",
       "description": "Leave empty to read applicationId from android/app/build.gradle(.kts) of the app anti-stuck-flutter started.",
+      "default": ""
+    },
+    "ios_bundle_id": {
+      "type": "string",
+      "title": "iOS bundle identifier override",
+      "description": "Leave empty to read PRODUCT_BUNDLE_IDENTIFIER from ios/Runner.xcodeproj/project.pbxproj.",
       "default": ""
     }
   }

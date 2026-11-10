@@ -300,7 +300,23 @@ r, e = finish(wB, 10)
 check('watch: every device the session waits for is watched', r == 2 and 'phone4 is free' in e, e[:200])
 p = as_session(B, 'exec', 'phone2', '--', 'true')
 p = as_session(B, 'release', 'phone2')
-check('devctl: release with nobody waiting retires the device', p.returncode == 0 and ledger_dev('phone2') is None and 'removed it from the ledger' in p.stdout, p.stdout + p.stderr)
+check('devctl: release with no app running drops the device from the ledger', p.returncode == 0 and ledger_dev('phone2') is None and 'released (no app running)' in p.stdout, p.stdout + p.stderr)
+# release with a running app keeps the app alive so the next session can reuse it without rebuilding; stop kills it
+fake_app = subprocess.Popen(['sleep', '60'])
+with open(os.path.join(HOME, 'state', 'devices', 'ledger.json'), 'r+') as lf:
+    ld = json.load(lf)
+    ld['devices']['phone5'] = {'owner': {'pid': int(A), 'label': f'pid{A}', 'cwd': '/tmp'}, 'purpose': 'flutter run', 'since': 'now',
+                               'app': {'pid': fake_app.pid, 'fifo': '/dev/null', 'log': '/dev/null', 'uri': 'http://127.0.0.1:9/x=/',
+                                       'ws': 'ws://127.0.0.1:9/x=/ws', 'started': 'now', 'cwd': '/tmp', 'branch': 'dev', 'head': 'abc', 'dirty': False},
+                               'waiters': []}
+    lf.seek(0); json.dump(ld, lf); lf.truncate()
+p = as_session(A, 'release', 'phone5')
+check('devctl: release keeps a running app alive for reuse', p.returncode == 0 and ledger_dev('phone5')['app']['pid'] == fake_app.pid and ledger_dev('phone5')['owner'] is None, p.stdout + p.stderr)
+p = as_session(B, 'attach', 'phone5')
+check('devctl: attach reuses the running app in 0 s without rebuilding', p.returncode == 0 and 'already running' in p.stdout and ledger_dev('phone5')['owner']['pid'] == int(B), p.stdout + p.stderr)
+p = as_session(B, 'stop', 'phone5')
+check('devctl: stop kills the running app and removes the device from the ledger', p.returncode == 0 and ledger_dev('phone5') is None, p.stdout + p.stderr)
+fake_app.kill()
 for f in fake:
     f.kill()
 

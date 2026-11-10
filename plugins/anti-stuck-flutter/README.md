@@ -8,8 +8,8 @@ Documentation and contributing: <https://github.com/toyaji/anti-stuck>.
 ## What it does
 
 - **`anti-stuck-flutter`** (taught to Claude by the **device-ledger** skill, which carries its full path) — one ledger that every Claude Code session on the machine shares for real devices, emulators and
-  heavy builds: `status`, `run <device> [flutter run args]`, `exec <device> -- <cmd>`, `build -- <cmd>` (one at a
-  time), `wait <device>`, `release <device>` (with waiters the app keeps running; with none it is stopped and the screen turned off), `stop <device>`, `emu <avd>`
+  heavy builds: `status`, `attach <device> [flutter attach args]` (launch already-installed app and attach without Xcode/Gradle build), `run <device> [flutter run args]`, `exec <device> -- <cmd>`, `build -- <cmd>` (one at a
+  time), `wait <device>`, `release <device>` (releases ownership while keeping a running app alive for 15 min so the next session can reuse it in 0 s; waiters are woken immediately), `stop <device>`, `emu <avd>`
 - **Wake on free** — while a session is on a device's waiters list, a background hook watches the ledger and wakes it the
   moment the device is free, even if the session is idle. The trigger is the ledger, not the command text, so a `wait`
   run through a variable or script is watched too, and so is every device the session waits for. All waiting sessions

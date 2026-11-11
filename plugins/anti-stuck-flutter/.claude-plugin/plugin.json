@@ -1,7 +1,7 @@
 {
   "name": "anti-stuck-flutter",
   "displayName": "Anti-Stuck for Flutter",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Flutter pack for anti-stuck: the anti-stuck-flutter command (with fast attach and running-app reuse), a cross-session ledger for real devices, emulators and heavy builds; fail-fast Marionette MCP guards; Flutter build/test time limits; flutter_tester runaway cleanup.",
   "author": { "name": "toyaji" },
   "homepage": "https://github.com/toyaji/anti-stuck",

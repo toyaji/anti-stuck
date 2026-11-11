@@ -3,7 +3,9 @@
 
 - Limit: the matching rule in the registries, otherwise 300 s. Registries, later ones add to earlier ones:
   plugin default, every pack's ~/.anti-stuck/packs/<pack>/command-timeouts.json,
-  ~/.anti-stuck/command-timeouts.json, the project's .claude/command-timeouts.json
+  ~/.anti-stuck/command-timeouts.json, the project's .claude/command-timeouts.json.
+  Rules see the code outside strings; a command with an eta line is also matched with strings and $VAR spelled
+  out, so `"/path/tool" run` and `T=/path/tool; $T run` get the same limit as `/path/tool run`
 - Route rules from packs (~/.anti-stuck/packs/<pack>/route-rules.json): a command matching `pattern` is denied
   with `message` unless the whole command matches `unless` (e.g. "flutter run" must go through anti-stuck-flutter)
 - Learned limit: a command with at least LEARN_MIN successful runs in the same directory gets max(LEARN_FLOOR,
@@ -132,6 +134,19 @@ def code_only(body):
     return UNQUOTE.sub("''", HEREDOC.sub('\n', body))
 
 
+ASSIGN = re.compile(r'(?:^|[\s;&|(])([A-Za-z_]\w*)=("[^"\n]*"|\'[^\'\n]*\'|[^\s;&|()]+)')
+
+
+def spelled_out(body):
+    """The command as the shell would run it: quotes removed and $VAR replaced by the value assigned in the command."""
+    s = HEREDOC.sub('\n', body)
+    values = {m.group(1): m.group(2).strip('\'"') for m in ASSIGN.finditer(s)}
+    s = UNQUOTE.sub(lambda m: m.group(0)[1:-1], s)
+    for name, value in values.items():
+        s = re.sub(r'\$\{?' + name + r'\}?(?!\w)', lambda _: value, s)
+    return re.sub(r'\s+', ' ', s).strip()
+
+
 def check_per_call_limits(u):
     if re.search(r'(^|[\s;&|(])(setsid|nohup|disown)\b', u):
         deny('setsid/nohup/disown escape the tlimit process group and become orphans outside any time limit. '
@@ -181,11 +196,13 @@ def main():
     norm = re.sub(r'\s+', ' ', re.sub(r'^\s*#\s*eta:[^\n]*\n', '', body)).strip()
     key = hashlib.sha1(norm.encode()).hexdigest()
     norm_code = re.sub(r'\s+', ' ', code).strip()
+    # Only a declared eta widens matching, so text that merely mentions a slow command never needs an eta line.
+    texts = [norm_code] + ([spelled_out(body)] if eta is not None else [])
 
     limit, learnable = DEFAULT, True
     for r in registries(data.get('cwd') or os.getcwd()):
         try:
-            if re.search(r['pattern'], norm_code):
+            if any(re.search(r['pattern'], t) for t in texts):
                 limit = max(limit, int(r['limit']))
                 learnable = learnable and r.get('learn', True) is not False
         except (re.error, KeyError, ValueError, TypeError):

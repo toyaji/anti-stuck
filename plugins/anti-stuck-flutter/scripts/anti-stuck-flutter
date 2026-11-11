@@ -374,28 +374,45 @@ def _start_or_attach(key, extra, me, purpose, cmd_list, wait_sec):
         if why:
             sys.exit(why)
         app = d.get('app')
-        if app and alive(app['pid']):
+        if app and alive(app['pid']) and app.get('uri'):
             print(describe(key, d, me) + f'\n-> My app is already running. Do not rebuild — hot reload / restart through Marionette.')
             return
-        if cmd_list is None:
-            cmd_list, err = prepare_attach_cmd(key, cwd, extra)
-            if err:
-                sys.exit(err)
-        os.makedirs(STATE, exist_ok=True)
-        tag = re.sub(r'[^A-Za-z0-9_.-]', '_', key)
-        fifo, log = os.path.join(STATE, f'{tag}.stdin'), os.path.join(STATE, f'{tag}.log')
-        if os.path.exists(fifo):
-            os.remove(fifo)
-        os.mkfifo(fifo)
-        flutter = ' '.join([repr(a) if ' ' in a else a for a in cmd_list])
-        proc = subprocess.Popen(['bash', '-c', f'exec 3<>"{fifo}"; exec {flutter} <&3 >"{log}" 2>&1'],
-                                cwd=cwd, start_new_session=True)
-        d['app'] = {'pid': proc.pid, 'fifo': fifo, 'log': log, 'uri': None, 'ws': None, 'started': now(),
-                    'cwd': cwd, **git_info(cwd)}
+        starting = app if app and alive(app['pid']) else None
+        if not starting:
+            proc, log = _launch(key, d, cwd, extra, cmd_list)
+    if starting:
+        # The call that started this app was cut off (e.g. its time limit) before the VM address appeared: wait for that same app.
+        pid = starting['pid']
+        print(f"{key}: the app started {starting['started']} is still starting — waiting for its VM address (log: {starting['log']}).")
+        _await_app(key, me, pid, lambda: alive(pid), starting['log'], wait_sec)
+    else:
+        _await_app(key, me, proc.pid, lambda: proc.poll() is None, log, wait_sec)
+
+
+def _launch(key, d, cwd, extra, cmd_list):
+    if cmd_list is None:
+        cmd_list, err = prepare_attach_cmd(key, cwd, extra)
+        if err:
+            sys.exit(err)
+    os.makedirs(STATE, exist_ok=True)
+    tag = re.sub(r'[^A-Za-z0-9_.-]', '_', key)
+    fifo, log = os.path.join(STATE, f'{tag}.stdin'), os.path.join(STATE, f'{tag}.log')
+    if os.path.exists(fifo):
+        os.remove(fifo)
+    os.mkfifo(fifo)
+    flutter = ' '.join([repr(a) if ' ' in a else a for a in cmd_list])
+    proc = subprocess.Popen(['bash', '-c', f'exec 3<>"{fifo}"; exec {flutter} <&3 >"{log}" 2>&1'],
+                            cwd=cwd, start_new_session=True)
+    d['app'] = {'pid': proc.pid, 'fifo': fifo, 'log': log, 'uri': None, 'ws': None, 'started': now(),
+                'cwd': cwd, **git_info(cwd)}
+    return proc, log
+
+
+def _await_app(key, me, pid, running, log, wait_sec):
     deadline = time.time() + wait_sec
     uri = None
     while time.time() < deadline:
-        if proc.poll() is not None:
+        if not running():
             break
         try:
             m = URI_RE.search(open(log, errors='replace').read())
@@ -407,14 +424,17 @@ def _start_or_attach(key, extra, me, purpose, cmd_list, wait_sec):
         time.sleep(2)
     with Ledger() as led:
         d = led.devices.get(key)
-        if uri and d and d.get('app'):
-            d['app']['uri'] = uri
-            d['app']['ws'] = 'ws://' + uri[len('http://'):] + 'ws'
+        app = d.get('app') if d else None
+        if app and app['pid'] != pid:
+            app = None
+        if uri and app:
+            app['uri'] = uri
+            app['ws'] = 'ws://' + uri[len('http://'):] + 'ws'
             print(describe(key, d, me))
             return
         tail = subprocess.run(['tail', '-30', log], capture_output=True, text=True).stdout
-        if d:
-            stop_app(d.get('app'))
+        if app:
+            stop_app(app)
             d['app'] = None
         sys.exit(f'{key}: the app did not start (failed or over {wait_sec} s). You still own the device — '
                  f'`{TOOL} release {key}` if you are done.\n{tail}')

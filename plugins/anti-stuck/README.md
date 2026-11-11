@@ -8,7 +8,9 @@ their own rules on top. Full documentation, packs and how to contribute: <https:
 ## What it does
 
 - Wraps every Bash command in `scripts/tlimit`, which runs it in its own process group and kills the group at the
-  limit (300 s by default; longer limits come from registries and need a `# eta:<seconds>` first line)
+  limit (300 s by default; longer limits come from registries and need a `# eta:<seconds>` first line). With an
+  eta line, a tool called by a quoted path or a shell variable (`"/path/tool" run`, `T=/path/tool; $T run`) gets the
+  same registry limit as the plain call
 - Learns each repeated command's limit from its own past runs in the same directory: the slowest of the last 5
   successful runs x 1.5 + 30 s (at least 60 s, never above the registry limit). A kill or failure among them
   gives the next run its full limit again

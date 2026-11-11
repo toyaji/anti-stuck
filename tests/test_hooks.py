@@ -155,6 +155,18 @@ fake_run('anti-stuck-flutter run phone1', 'DONE', 0.5)
 got, text = enforce('# eta:400 build and launch\nanti-stuck-flutter run phone1')
 check('pack: anti-stuck-flutter run never learns a short limit from quick reuses', got == 'allow' and ' 800 ' in text, text)
 check('pack time limit: flutter build needs eta', 'eta' in enforce('devctl build -- flutter build apk')[1])
+ASF_PATH = '/x/plugins/anti-stuck-flutter/scripts/anti-stuck-flutter'
+for name, cmd in [
+    ('quoted tool path', f'"{ASF_PATH}" run phone1'),
+    ('tool path in a quoted variable', f'A="{ASF_PATH}"; "$A" run phone1'),
+    ('tool path in a plain variable', f'P={ASF_PATH}; $P run phone1'),
+    ('tool path in ${VAR}', f'S={ASF_PATH}; ${{S}} run phone1'),
+    ('build inside bash -c quotes', f'"{ASF_PATH}" build -- bash -c \'cd /p && flutter build ios --profile\''),
+]:
+    got, text = enforce(f'# eta:400 launch\n{cmd}')
+    check(f'pack time limit with eta: {name}', got == 'allow' and ' 800 ' in text, f'{got}: {text}')
+got, text = enforce('grep -n "anti-stuck-flutter run" notes.md')
+check('pack time limit: a quoted mention without eta still gets 300 s and no eta demand', got == 'allow' and ' 300 ' in text, f'{got}: {text}')
 
 # ── report_long_calls
 def report(payload):
@@ -316,6 +328,30 @@ p = as_session(B, 'attach', 'phone5')
 check('devctl: attach reuses the running app in 0 s without rebuilding', p.returncode == 0 and 'already running' in p.stdout and ledger_dev('phone5')['owner']['pid'] == int(B), p.stdout + p.stderr)
 p = as_session(B, 'stop', 'phone5')
 check('devctl: stop kills the running app and removes the device from the ledger', p.returncode == 0 and ledger_dev('phone5') is None, p.stdout + p.stderr)
+fake_app.kill()
+# a start cut off before the VM address (its Bash call hit the time limit) is waited for, not reported as ready
+fake_app = subprocess.Popen(['sleep', '60'])
+app_log = os.path.join(HOME, 'phone6.log')
+open(app_log, 'w').write('Xcode build done.\n')
+with open(os.path.join(HOME, 'state', 'devices', 'ledger.json'), 'r+') as lf:
+    ld = json.load(lf)
+    ld['devices']['phone6'] = {'owner': None, 'purpose': None, 'since': 'now', 'free_since': 'now', 'free_at': time.time() + 900,
+                               'app': {'pid': fake_app.pid, 'fifo': '/dev/null', 'log': app_log, 'uri': None, 'ws': None,
+                                       'started': 'now', 'cwd': '/tmp', 'branch': 'dev', 'head': 'abc', 'dirty': False},
+                               'waiters': []}
+    lf.seek(0); json.dump(ld, lf); lf.truncate()
+def late_uri():
+    time.sleep(3)
+    open(app_log, 'a').write('A Dart VM Service on phone6 is available at: http://127.0.0.1:5555/abc=/\n')
+import threading
+threading.Thread(target=late_uri).start()
+p = as_session(B, 'run', 'phone6')
+check('devctl: run after a cut-off start waits for that app and records its VM address',
+      p.returncode == 0 and 'still starting' in p.stdout and ledger_dev('phone6')['app']['ws'] == 'ws://127.0.0.1:5555/abc=/ws'
+      and ledger_dev('phone6')['app']['pid'] == fake_app.pid, p.stdout + p.stderr)
+p = as_session(B, 'run', 'phone6')
+check('devctl: run with a known VM address reuses the app at once', p.returncode == 0 and 'already running' in p.stdout, p.stdout + p.stderr)
+as_session(B, 'stop', 'phone6')
 fake_app.kill()
 for f in fake:
     f.kill()
